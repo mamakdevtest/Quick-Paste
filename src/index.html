@@ -4,163 +4,577 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QuickPaste</title>
-  <link rel="stylesheet" href="/style.css">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            /* Dark mode palette */
+            'd-bg':     '#121212',
+            'd-card':   '#1a1b23',
+            'd-hover':  '#252630',
+            'd-input':  '#181920',
+            'd-border': '#2f313d',
+            'd-border2':'#4b4d5a',
+            'd-text':   '#e2e2e4',
+            'd-dim':    '#8b8d98',
+            'd-primary':'#60a5fa',
+            /* Light mode palette — Material You */
+            'l-bg':     '#fdf7ff',
+            'l-surface':'#fdf7ff',
+            'l-card':   '#f2ecf4',
+            'l-hover':  '#e6e0e9',
+            'l-border': '#cbc4d2',
+            'l-text':   '#1d1b20',
+            'l-dim':    '#49454f',
+            'l-primary':'#4f378a',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* ─── Base ───────────────────────────────────────────────────────────────── */
+    html, body { background: transparent; overflow: hidden; }
+    body { font-family: 'Inter', sans-serif; font-size: 13px; user-select: none; }
+
+    /* ─── Material Symbols ──────────────────────────────────────────────────── */
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      display: inline-flex; align-items: center; justify-content: center;
+      vertical-align: middle;
+    }
+    .material-symbols-outlined.fill { font-variation-settings: 'FILL' 1; }
+
+    /* ─── Tauri drag region ─────────────────────────────────────────────────── */
+    #headerFrame { -webkit-app-region: drag; }
+    #headerFrame button, #headerFrame select { -webkit-app-region: no-drag; }
+
+    /* ─── Panel sliding ─────────────────────────────────────────────────────── */
+    #panelTrack {
+      display: flex; flex-direction: row;
+      width: 300%; height: 100%;
+      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #panelTrack.settings-open  { transform: translateX(-33.333%); }
+    #panelTrack.dashboard-open { transform: translateX(-66.666%); }
+
+    #listPanel, #settingsScroll, #dashboardScroll {
+      width: 33.333%; flex-shrink: 0; height: 100%; overflow-y: auto;
+    }
+
+    /* ─── Main layout ───────────────────────────────────────────────────────── */
+    #mainContainer {
+      display: flex; flex-direction: column;
+      width: 100vw; height: 100vh;
+      border-radius: 12px; overflow: hidden;
+    }
+    #bodyArea { flex: 1; overflow: hidden; }
+
+    /* ─── Snippet card left stripe ──────────────────────────────────────────── */
+    .snippet-card { position: relative; }
+    .card-stripe {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 3px; border-radius: 8px 0 0 8px;
+    }
+
+    /* ─── Scrollbar ─────────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+    /* ─── Toggle switch ─────────────────────────────────────────────────────── */
+    .qp-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .qp-switch input { opacity: 0; width: 0; height: 0; }
+    .qp-slider {
+      position: absolute; inset: 0; background: #3f3f46;
+      border-radius: 24px; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .qp-slider::before {
+      content: ''; position: absolute;
+      width: 18px; height: 18px; border-radius: 50%;
+      left: 3px; top: 3px; background: #a1a1aa;
+      transition: transform 0.2s, background 0.2s;
+    }
+    input:checked + .qp-slider { background: #00d859; }
+    input:checked + .qp-slider::before { transform: translateX(20px); background: #000; }
+
+    /* ─── Kbd chips ─────────────────────────────────────────────────────────── */
+    .kbd-chip {
+      display: inline-flex; align-items: center;
+      padding: 4px 10px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; font-weight: 700;
+      border: 1px solid;
+    }
+    .dark .kbd-chip { background: #252630; border-color: #4b4d5a; color: #e2e2e4; }
+    .light .kbd-chip { background: #e6e0e9; border-color: #cbc4d2; color: #1d1b20; }
+
+    /* ─── Shortcut badges on cards ──────────────────────────────────────────── */
+    .shortcut-badge {
+      display: inline-flex; align-items: center;
+      padding: 1px 6px; border-radius: 4px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+      color: #fff; flex-shrink: 0;
+    }
+
+    /* ─── Dialog overlay ────────────────────────────────────────────────────── */
+    #dialogOverlay {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+    }
+    #dialogOverlay.hidden { display: none; }
+
+    /* ─── Placeholder overlay ────────────────────────────────────────────────── */
+    #placeholderOverlay {
+      position: fixed; inset: 0; z-index: 1100;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+    }
+    #placeholderOverlay.hidden { display: none; }
+
+    /* ─── Command palette overlay ────────────────────────────────────────────── */
+    #commandPaletteOverlay {
+      position: fixed; inset: 0; z-index: 9000;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 60px;
+    }
+    #commandPaletteOverlay.hidden { display: none; }
+
+    /* ─── Quick look overlay ─────────────────────────────────────────────────── */
+    #quickLookOverlay {
+      position: fixed; inset: 0; z-index: 8000;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #quickLookOverlay.hidden { display: none; }
+
+    /* ─── Transform submenu ──────────────────────────────────────────────────── */
+    #transformSubmenu {
+      position: fixed; z-index: 10000;
+      border-radius: 10px; min-width: 180px; padding: 4px 0;
+      animation: ctxFadeIn 0.1s ease;
+    }
+    .dark #transformSubmenu { background: #1a1b23; border: 1px solid #2f313d; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    #transformSubmenu.hidden { display: none; }
+
+    .transform-item {
+      display: block; width: 100%; text-align: left;
+      padding: 7px 14px; font-size: 11px; font-family: 'Inter', sans-serif;
+      background: transparent; border: none; cursor: pointer;
+      transition: background 0.1s;
+    }
+    .dark .transform-item { color: #e2e2e4; }
+    .transform-item:hover { background: #252630; color: #60a5fa; }
+    .transform-separator { height: 1px; background: #2f313d; margin: 3px 0; }
+
+    /* ─── Custom context menu ────────────────────────────────────────────────── */
+    .custom-context-menu {
+      position: fixed; z-index: 9500;
+      border-radius: 10px; padding: 4px 0; min-width: 150px;
+      animation: ctxFadeIn 0.1s ease;
+    }
+    .dark .custom-context-menu { background: #1a1b23; border: 1px solid #2f313d; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    @keyframes ctxFadeIn { from { opacity: 0; transform: scale(0.95) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+    .context-item {
+      display: block; width: 100%; text-align: left;
+      padding: 7px 14px; font-size: 12px; font-family: 'Inter', sans-serif;
+      background: transparent; border: none; cursor: pointer;
+      transition: background 0.1s;
+    }
+    .dark .context-item { color: #e2e2e4; }
+    .context-item:hover { background: #252630; }
+    .context-item.danger { color: #f87171; }
+    .context-item.has-submenu::after { content: ' ›'; float: right; opacity: 0.5; }
+
+    /* ─── Toast ──────────────────────────────────────────────────────────────── */
+    #toastContainer {
+      position: fixed; bottom: 52px; left: 50%; transform: translateX(-50%);
+      z-index: 9999; display: flex; flex-direction: column; align-items: center; gap: 6px;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 500;
+      color: #fff; pointer-events: none; white-space: nowrap;
+      animation: toastIn 0.2s ease;
+    }
+    .toast.success { background: #16a34a; }
+    .toast.error   { background: #dc2626; }
+    .toast.info    { background: #2563eb; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ─── Activity bars ──────────────────────────────────────────────────────── */
+    .db-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .db-bar-bg { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+    .db-bar-fill { width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; transition: height 0.4s ease; }
+
+    /* ─── Breakdown bar ──────────────────────────────────────────────────────── */
+    .breakdown-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+
+    /* ─── Opacity slider ─────────────────────────────────────────────────────── */
+    input[type="range"].qp-range {
+      -webkit-appearance: none; appearance: none;
+      height: 4px; border-radius: 4px; outline: none; cursor: pointer;
+    }
+    .dark input[type="range"].qp-range { background: #3f3f46; }
+    input[type="range"].qp-range::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: #60a5fa; cursor: pointer;
+    }
+
+    /* ─── Drag handle ────────────────────────────────────────────────────────── */
+    .drag-handle { cursor: grab; opacity: 0; transition: opacity 0.15s; }
+    .snippet-card:hover .drag-handle { opacity: 1; }
+
+    /* ─── Secret masked ──────────────────────────────────────────────────────── */
+    .secret-masked { letter-spacing: 3px; font-size: 18px; }
+
+    /* ─── Pin indicator on cards ─────────────────────────────────────────────── */
+    .pin-indicator { display: none; }
+    .pinned-card .pin-indicator { display: inline; }
+
+    /* ─── Multi-select card ──────────────────────────────────────────────────── */
+    .multi-selected { outline: 2px solid #60a5fa; outline-offset: -2px; }
+
+    /* ─── Smart type badges ──────────────────────────────────────────────────── */
+    .smart-type-badge {
+      font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+      background: rgba(96,165,250,0.15); color: #60a5fa;
+      text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0;
+    }
+    .chain-badge {
+      font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+      background: linear-gradient(135deg, #818cf8, #60a5fa); color: #fff; flex-shrink: 0;
+    }
+    .expr-badge {
+      font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+      background: rgba(96,165,250,0.15); color: #60a5fa;
+      font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
+    }
+    .linked-snippet-badge {
+      font-size: 8px; font-weight: 600; padding: 1px 5px; border-radius: 4px;
+      background: rgba(255,255,255,0.08); color: #8b8d98; flex-shrink: 0;
+    }
+    .snippet-emoji { font-size: 14px; line-height: 1; flex-shrink: 0; }
+
+    /* ─── Smart action buttons ───────────────────────────────────────────────── */
+    .smart-actions-row { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+    .smart-action-btn {
+      font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: 5px;
+      border: 1px solid #60a5fa; background: rgba(96,165,250,0.12); color: #60a5fa;
+      cursor: pointer; transition: background 0.12s, color 0.12s; white-space: nowrap;
+    }
+    .smart-action-btn:hover { background: #60a5fa; color: #000; }
+
+    /* ─── Color swatch preview ───────────────────────────────────────────────── */
+    .color-preview-swatch {
+      display: inline-block; width: 14px; height: 14px; border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.15); vertical-align: middle; margin-left: 4px;
+    }
+
+    /* ─── Color picker dots ──────────────────────────────────────────────────── */
+    .color-dot-btn {
+      width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent;
+      cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; transition: transform 0.12s, border-color 0.12s;
+      flex-shrink: 0;
+    }
+    .color-dot-btn:hover { transform: scale(1.15); }
+    .color-dot-btn.active { border-color: #e2e2e4; box-shadow: 0 0 0 3px rgba(255,255,255,0.15); }
+
+    /* ─── Theme picker dots ──────────────────────────────────────────────────── */
+    .theme-dot-btn {
+      width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent;
+      cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+      transition: transform 0.15s, border-color 0.15s; flex-shrink: 0; background: transparent;
+    }
+    .theme-dot-btn:hover { transform: scale(1.15); }
+    .theme-dot-btn.active { border-color: #e2e2e4; box-shadow: 0 0 0 3px rgba(255,255,255,0.12); }
+    .theme-dot-inner {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-size: 12px;
+    }
+
+    /* ─── Storage path ───────────────────────────────────────────────────────── */
+    #storagePathLabel {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 6px 8px;
+      border-radius: 6px; word-break: break-all; line-height: 1.5;
+    }
+    .dark #storagePathLabel { background: #0d0d12; color: #8b8d98; }
+
+    /* ─── Char counter ───────────────────────────────────────────────────────── */
+    .char-counter { font-size: 10px; text-align: right; }
+    .dark .char-counter { color: #8b8d98; }
+    .char-counter.warn { color: #f59e0b; }
+    .char-counter.limit { color: #f87171; }
+
+    /* ─── Shortcut warning ───────────────────────────────────────────────────── */
+    .shortcut-warn { font-size: 10px; color: #f59e0b; margin-top: 3px; padding: 2px 4px; }
+    .shortcut-warn.hidden { display: none; }
+
+    /* ─── Fuzzy highlight ────────────────────────────────────────────────────── */
+    .highlight { color: #60a5fa; font-weight: 700; background: rgba(96,165,250,0.12); border-radius: 2px; padding: 0 1px; }
+
+    /* ─── Empty state ────────────────────────────────────────────────────────── */
+    .empty-state { text-align: center; padding: 40px 20px; }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-title { font-size: 14px; font-weight: 700; }
+    .dark .empty-title { color: #e2e2e4; }
+    .empty-desc { font-size: 12px; margin-top: 4px; }
+    .dark .empty-desc { color: #8b8d98; }
+
+    /* ─── Reveal btn ─────────────────────────────────────────────────────────── */
+    .reveal-btn {
+      font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 3px;
+      transition: background 0.12s; flex-shrink: 0;
+    }
+    .dark .reveal-btn { border: 1px solid #2f313d; background: transparent; color: #8b8d98; }
+    .dark .reveal-btn:hover { background: rgba(255,255,255,0.05); color: #e2e2e4; }
+  </style>
 </head>
-<body>
-  <div id="mainContainer">
-    <!-- Header -->
-    <div id="headerFrame">
-      <div id="appTitle">QuickPaste</div>
-      <div class="spacer"></div>
-      <button id="pinWindowBtn" class="header-btn" title="Toggle Pinned Mode">📌</button>
-      <button id="dashboardBtn" class="header-btn" title="Toggle Dashboard">📊</button>
-      <button id="settingsBtn" class="header-btn" title="Toggle Settings">⚙</button>
-      <button id="closeBtn" class="header-btn" title="Close Window">✕</button>
+<body class="dark">
+
+<!-- Toast container -->
+<div id="toastContainer"></div>
+
+<div id="mainContainer" class="dark:bg-d-bg bg-l-bg text-d-text dark:text-d-text flex flex-col">
+
+  <!-- ═══════════════════════════════════════════════════════ HEADER -->
+  <header id="headerFrame" class="flex items-center justify-between px-4 py-2.5 border-b dark:border-d-border shrink-0">
+    <div id="appTitle" class="text-lg font-bold tracking-wide text-d-primary select-none">QuickPaste</div>
+    <div class="flex items-center gap-2">
+      <!-- Pin button -->
+      <button id="pinWindowBtn" title="Toggle Pinned Mode"
+        class="w-8 h-8 rounded border-2 border-d-primary bg-indigo-900/40 flex items-center justify-content-center justify-center hover:bg-indigo-800/60 transition-colors">
+        <span class="material-symbols-outlined fill text-red-400" style="font-size:16px;">push_pin</span>
+      </button>
+      <!-- Dashboard button -->
+      <button id="dashboardBtn" title="Dashboard & Stats"
+        class="w-7 h-7 rounded flex items-center justify-center dark:hover:bg-d-hover transition-colors">
+        <div class="flex gap-0.5 h-3.5">
+          <div class="w-1 bg-pink-500 rounded-sm"></div>
+          <div class="w-1 bg-green-400 rounded-sm"></div>
+          <div class="w-1 bg-blue-400 rounded-sm"></div>
+        </div>
+      </button>
+      <!-- Settings button -->
+      <button id="settingsBtn" title="Settings"
+        class="w-7 h-7 rounded flex items-center justify-center text-d-dim dark:hover:bg-d-hover hover:text-d-text transition-colors">
+        <span class="material-symbols-outlined" style="font-size:20px;">settings</span>
+      </button>
+      <!-- Close button -->
+      <button id="closeBtn" title="Close"
+        class="w-7 h-7 rounded flex items-center justify-center text-d-dim dark:hover:bg-d-hover hover:text-d-text transition-colors">
+        <span class="material-symbols-outlined" style="font-size:22px;">close</span>
+      </button>
     </div>
+  </header>
 
-    <div id="bodyArea">
-      <div id="panelTrack">
+  <!-- ═══════════════════════════════════════════════════════ BODY (panel track) -->
+  <div id="bodyArea" class="flex-1 overflow-hidden">
+    <div id="panelTrack">
 
-        <!-- Panel 1: Search + Snippet List -->
-        <div id="listPanel">
-          <div id="searchFrame">
-            <div class="search-row">
-              <input type="text" id="searchInput" placeholder="Search snippets…" autocomplete="off">
-              <select id="categoryFilter">
-                <option value="All">All</option>
-              </select>
+      <!-- ─────────────────────────────────── PANEL 1: LIST -->
+      <div id="listPanel" class="flex flex-col">
+
+        <!-- Search + Category -->
+        <div id="searchFrame" class="px-3 py-2.5 flex flex-col gap-2 border-b dark:border-d-border shrink-0">
+          <div class="flex gap-2">
+            <div class="relative flex-1">
+              <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-d-dim pointer-events-none" style="font-size:16px;">search</span>
+              <input type="text" id="searchInput" placeholder="Search snippets…" autocomplete="off"
+                class="w-full dark:bg-d-input dark:border-d-border dark:text-d-text dark:placeholder-d-dim border rounded-md pl-8 pr-3 py-1.5 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-sans"/>
             </div>
-            <div class="toolbar-row">
-              <select id="sortSelect" title="Sort snippets">
-                <option value="default">📌 Default</option>
-                <option value="az">A → Z</option>
-                <option value="za">Z → A</option>
-                <option value="most_used">🔥 Most Used</option>
-                <option value="newest">🕐 Newest</option>
-                <option value="oldest">📅 Oldest</option>
-              </select>
-              <button id="clipboardImportBtn" class="toolbar-btn" title="Add snippet from clipboard">📋 From Clipboard</button>
-              <button id="multiSelectBtn" class="toolbar-btn" title="Multi-select mode">☑ Select</button>
-            </div>
+            <select id="categoryFilter"
+              class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-md px-2 py-1.5 text-sm focus:outline-none dark:focus:border-d-primary appearance-none cursor-pointer pr-6 font-sans">
+              <option value="All">All</option>
+            </select>
           </div>
-
-          <!-- Multi-select bulk action bar -->
-          <div id="bulkActionBar" class="hidden">
-            <span id="selectedCount">0 selected</span>
-            <div class="spacer"></div>
-            <button id="bulkStackBtn" class="bulk-btn" style="background: var(--primary); color: #ffffff;" title="Add selected items to paste stack">📚 Stack</button>
-            <button id="bulkDeleteBtn" class="bulk-btn danger">🗑 Delete</button>
-            <button id="bulkCancelBtn" class="bulk-btn">✕ Cancel</button>
-          </div>
-
-          <div id="scrollArea">
-            <div id="listContainer">
-              <!-- Snippets populated via JS -->
-            </div>
+          <!-- Toolbar -->
+          <div class="flex gap-2 text-xs">
+            <select id="sortSelect"
+              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-2 py-1 text-xs focus:outline-none appearance-none cursor-pointer font-sans flex-shrink-0">
+              <option value="default">📌 Default</option>
+              <option value="az">A → Z</option>
+              <option value="za">Z → A</option>
+              <option value="most_used">🔥 Most Used</option>
+              <option value="newest">🕐 Newest</option>
+              <option value="oldest">📅 Oldest</option>
+            </select>
+            <button id="clipboardImportBtn"
+              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-2.5 py-1 flex items-center gap-1 dark:hover:bg-d-hover transition-colors text-xs whitespace-nowrap">
+              <span class="material-symbols-outlined text-orange-400" style="font-size:13px;">content_paste</span>
+              From Clipboard
+            </button>
+            <button id="multiSelectBtn"
+              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-2.5 py-1 flex items-center gap-1 dark:hover:bg-d-hover transition-colors text-xs whitespace-nowrap">
+              <span class="material-symbols-outlined" style="font-size:13px;">check_box</span>
+              Select
+            </button>
           </div>
         </div>
 
-        <!-- Panel 2: Settings -->
-        <div id="settingsScroll">
-          <div class="settings-content">
-            <!-- Hotkey Card -->
-            <div class="section-header">HOTKEY</div>
-            <div class="settings-card">
-              <div class="card-title-row">
-                <span class="card-icon">⌨</span>
-                <span class="card-title">Global Shortcut</span>
-              </div>
-              <div class="kbd-row" id="hotkeyKeysRow">
-                <!-- Populated dynamically -->
-              </div>
-              <div class="hotkey-capture-row">
-                <input type="text" id="hotkeyInput" class="hotkey-capture-input" placeholder="Click & press keys to set…" readonly>
-                <button id="hotkeyClearBtn" class="hotkey-clear-btn" title="Reset to default">↺</button>
-              </div>
-              <div class="card-desc">Summon QuickPaste from anywhere.</div>
-            </div>
+        <!-- Bulk Action Bar (hidden by default) -->
+        <div id="bulkActionBar" class="hidden px-3 py-2 flex items-center gap-2 dark:bg-indigo-900/30 border-b dark:border-d-border shrink-0">
+          <span id="selectedCount" class="text-xs font-semibold dark:text-d-dim">0 selected</span>
+          <div class="flex-1"></div>
+          <button id="bulkStackBtn"
+            class="px-2.5 py-1 rounded text-xs font-semibold bg-d-primary text-black hover:opacity-90 transition-opacity">
+            📚 Stack
+          </button>
+          <button id="bulkDeleteBtn"
+            class="px-2.5 py-1 rounded text-xs font-semibold bg-red-600/80 text-white hover:bg-red-600 transition-colors">
+            🗑 Delete
+          </button>
+          <button id="bulkCancelBtn"
+            class="px-2.5 py-1 rounded text-xs font-semibold dark:bg-d-input dark:text-d-dim dark:hover:bg-d-hover transition-colors">
+            ✕ Cancel
+          </button>
+        </div>
 
-            <!-- Preferences -->
-            <div class="section-header">PREFERENCES</div>
-            <div class="settings-card toggle-card">
-              <div class="toggle-info">
-                <div class="card-title-row">
-                  <span class="card-icon">⚡</span>
-                  <span class="card-title">Default Auto-Paste</span>
-                </div>
-                <div class="card-desc">Automatically paste selected item.</div>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="autoPasteToggle">
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div class="settings-card toggle-card">
-              <div class="toggle-info">
-                <div class="card-title-row">
-                  <span class="card-icon">🚀</span>
-                  <span class="card-title">Start with Windows</span>
-                </div>
-                <div class="card-desc">Launch QuickPaste on login.</div>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="startupToggle">
-                <span class="slider"></span>
-              </label>
-            </div>
+        <!-- Snippet list scroll area -->
+        <div id="scrollArea" class="flex-1 overflow-y-auto p-3">
+          <div id="listContainer" class="flex flex-col gap-2.5">
+            <!-- Snippets rendered by JS -->
+          </div>
+        </div>
+      </div>
 
-            <!-- Appearance -->
-            <div class="section-header">APPEARANCE</div>
-            <div class="settings-card toggle-card">
-              <div class="toggle-info">
-                <div class="card-title-row">
-                  <span class="card-icon">🌙</span>
-                  <span class="card-title">Dark Mode</span>
-                </div>
-                <div class="card-desc">Switch to dark color theme.</div>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="darkModeToggle">
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div class="settings-card">
-              <div class="card-title-row">
-                <span class="card-icon">💧</span>
-                <span class="card-title">Window Opacity</span>
-              </div>
-              <div class="opacity-row">
-                <input type="range" id="opacitySlider" min="30" max="100" value="100" step="5" class="opacity-slider">
-                <span id="opacityLabel" class="opacity-label">100%</span>
-              </div>
-              <div class="card-desc">Adjust window transparency.</div>
-            </div>
+      <!-- ─────────────────────────────────── PANEL 2: SETTINGS -->
+      <div id="settingsScroll" class="dark:bg-d-bg overflow-y-auto">
+        <div class="p-4 flex flex-col gap-5">
 
-            <!-- Clipboard -->
-            <div class="section-header">CLIPBOARD</div>
-            <div class="settings-card toggle-card">
-              <div class="toggle-info">
-                <div class="card-title-row">
-                  <span class="card-icon">📋</span>
-                  <span class="card-title">Clipboard History</span>
-                </div>
-                <div class="card-desc">Auto-capture everything you copy.</div>
+          <!-- HOTKEY -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">Hotkey</p>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3.5">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">keyboard</span>
+                <span class="font-semibold text-sm dark:text-d-text">Global Shortcut</span>
               </div>
-              <label class="switch">
-                <input type="checkbox" id="clipboardHistoryToggle">
-                <span class="slider"></span>
-              </label>
+              <div class="flex gap-2 mb-3" id="hotkeyKeysRow">
+                <!-- Kbd chips rendered by JS -->
+              </div>
+              <div class="flex gap-2 mb-2">
+                <input type="text" id="hotkeyInput" readonly placeholder="Click & press keys to set…"
+                  class="flex-1 dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-lg px-3 py-1.5 text-xs font-mono focus:outline-none dark:focus:border-d-primary cursor-pointer"/>
+                <button id="hotkeyClearBtn" title="Reset to default"
+                  class="px-2.5 py-1.5 dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-lg text-sm dark:hover:bg-d-hover transition-colors">↺</button>
+              </div>
+              <p class="text-xs dark:text-d-dim">Summon QuickPaste from anywhere.</p>
             </div>
-            <div class="settings-card toggle-card" style="flex-direction: column; align-items: stretch; gap: 8px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                <div class="toggle-info">
-                  <div class="card-title-row">
-                    <span class="card-icon">🧹</span>
-                    <span class="card-title">Auto-Clean History</span>
+          </div>
+
+          <!-- PREFERENCES -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">Preferences</p>
+            <div class="flex flex-col gap-2">
+              <!-- Auto-paste -->
+              <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <span>⚡</span>
+                    <span class="font-semibold text-sm dark:text-d-text">Default Auto-Paste</span>
                   </div>
-                  <div class="card-desc">Remove clipboard history after N days.</div>
+                  <p class="text-xs dark:text-d-dim ml-5">Automatically paste selected item.</p>
                 </div>
-                <select id="historyDurationInput" class="dialog-input dialog-select" style="width: auto; padding: 4px 8px; font-size: 11px;">
+                <label class="qp-switch"><input type="checkbox" id="autoPasteToggle"><span class="qp-slider"></span></label>
+              </div>
+              <!-- Startup -->
+              <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <span>🚀</span>
+                    <span class="font-semibold text-sm dark:text-d-text">Start with Windows</span>
+                  </div>
+                  <p class="text-xs dark:text-d-dim ml-5">Launch QuickPaste on login.</p>
+                </div>
+                <label class="qp-switch"><input type="checkbox" id="startupToggle"><span class="qp-slider"></span></label>
+              </div>
+            </div>
+          </div>
+
+          <!-- APPEARANCE -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">Appearance</p>
+            <div class="flex flex-col gap-2">
+              <!-- Dark mode -->
+              <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <span>🌙</span>
+                    <span class="font-semibold text-sm dark:text-d-text">Dark Mode</span>
+                  </div>
+                  <p class="text-xs dark:text-d-dim ml-5">Switch to dark color theme.</p>
+                </div>
+                <label class="qp-switch"><input type="checkbox" id="darkModeToggle"><span class="qp-slider"></span></label>
+              </div>
+              <!-- Accent color -->
+              <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3">
+                <div class="flex items-center gap-2 mb-1">
+                  <span>🎨</span>
+                  <span class="font-semibold text-sm dark:text-d-text">Accent Color</span>
+                </div>
+                <p class="text-xs dark:text-d-dim ml-5 mb-2">Choose your preferred accent color.</p>
+                <div class="flex flex-wrap gap-2 ml-5" id="themePickerGrid"></div>
+              </div>
+              <!-- Opacity -->
+              <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3">
+                <div class="flex items-center gap-2 mb-2">
+                  <span>💧</span>
+                  <span class="font-semibold text-sm dark:text-d-text">Window Opacity</span>
+                </div>
+                <div class="flex items-center gap-3 ml-5">
+                  <input type="range" id="opacitySlider" min="30" max="100" value="100" step="5" class="qp-range flex-1"/>
+                  <span id="opacityLabel" class="text-xs font-mono dark:text-d-dim w-8 text-right">100%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CLIPBOARD -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">Clipboard</p>
+            <div class="flex flex-col gap-2">
+              <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <span>📋</span>
+                    <span class="font-semibold text-sm dark:text-d-text">Clipboard History</span>
+                  </div>
+                  <p class="text-xs dark:text-d-dim ml-5">Auto-capture everything you copy.</p>
+                </div>
+                <label class="qp-switch"><input type="checkbox" id="clipboardHistoryToggle"><span class="qp-slider"></span></label>
+              </div>
+              <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <span>🧹</span>
+                    <span class="font-semibold text-sm dark:text-d-text">Auto-Clean History</span>
+                  </div>
+                  <p class="text-xs dark:text-d-dim ml-5">Remove clipboard history after N days.</p>
+                </div>
+                <select id="historyDurationInput"
+                  class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-2 py-1 text-xs focus:outline-none">
                   <option value="1">1 Day</option>
                   <option value="3">3 Days</option>
                   <option value="7">7 Days</option>
@@ -171,184 +585,277 @@
                 </select>
               </div>
             </div>
+          </div>
 
-            <!-- Storage & Actions -->
-            <div class="section-header">STORAGE</div>
-            <div class="settings-card">
-              <div class="card-title-row">
-                <span class="card-icon">📁</span>
-                <span class="card-title">Storage Path</span>
+          <!-- STORAGE -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">Storage</p>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="material-symbols-outlined text-d-dim" style="font-size:16px;">folder</span>
+                <span class="font-semibold text-sm dark:text-d-text">Storage Path</span>
               </div>
-              <div class="path-field" id="storagePathLabel">Loading path...</div>
-              <div class="ie-row">
-                <button id="exportBtn" class="ie-btn">Export Data</button>
-                <button id="importBtn" class="ie-btn">Import Data</button>
+              <div id="storagePathLabel" class="mb-3 text-[10px]">Loading path…</div>
+              <div class="flex gap-2">
+                <button id="exportBtn"
+                  class="flex-1 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
+                  Export Data
+                </button>
+                <button id="importBtn"
+                  class="flex-1 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
+                  Import Data
+                </button>
               </div>
-            </div>
-
-            <!-- Danger Zone -->
-            <button id="clearBtn">🗑  Clear All Data</button>
-
-            <!-- About / Copyright -->
-            <div class="settings-about">
-              <div>QuickPaste v0.1.0</div>
-              <div>© 2026 Emir Han Mamak</div>
-              <div>Mamak Studio</div>
             </div>
           </div>
-        </div>
 
-        <!-- Panel 3: Dashboard -->
-        <div id="dashboardScroll">
-          <div class="dashboard-content">
-            <div class="section-header">DASHBOARD & STATS</div>
-
-            <!-- General Counters Grid -->
-            <div class="db-grid">
-              <div class="db-card">
-                <div class="db-card-val" id="statTotalPastes">0</div>
-                <div class="db-card-label">Total Pastes</div>
-              </div>
-              <div class="db-card">
-                <div class="db-card-val" id="statTimeSaved">0m</div>
-                <div class="db-card-label">Time Saved</div>
-              </div>
-              <div class="db-card">
-                <div class="db-card-val" id="statTotalChars">0</div>
-                <div class="db-card-label">Chars Copied</div>
-              </div>
-            </div>
-
-            <!-- Top Snippets Section -->
-            <div class="db-section-title">🔥 MOST USED SNIPPETS</div>
-            <div class="db-list" id="statTopSnippetsList">
-              <!-- Rendered via JS -->
-            </div>
-
-            <!-- 7-Day Activity Histogram Chart -->
-            <div class="db-section-title">📈 7-DAY ACTIVITY</div>
-            <div class="db-chart-container">
-              <div class="db-chart-bars" id="statActivityBars">
-                <!-- Rendered via JS -->
-              </div>
-            </div>
-
-            <!-- Category & Type Share Breakdown -->
-            <div class="db-section-title">📊 METRICS BREAKDOWN</div>
-            <div class="db-breakdown-card">
-              <div class="breakdown-item">
-                <div class="breakdown-label">Text Snippets</div>
-                <div class="breakdown-bar-bg">
-                  <div class="breakdown-bar-fill" id="barTypeText" style="width: 0%"></div>
-                </div>
-              </div>
-              <div class="breakdown-item">
-                <div class="breakdown-label">Code Snippets</div>
-                <div class="breakdown-bar-bg">
-                  <div class="breakdown-bar-fill" id="barTypeCode" style="width: 0%"></div>
-                </div>
-              </div>
-              <div class="breakdown-item">
-                <div class="breakdown-label">URLs</div>
-                <div class="breakdown-bar-bg">
-                  <div class="breakdown-bar-fill" id="barTypeUrl" style="width: 0%"></div>
-                </div>
-              </div>
-              <div class="breakdown-item">
-                <div class="breakdown-label">Passwords</div>
-                <div class="breakdown-bar-bg">
-                  <div class="breakdown-bar-fill" id="barTypePassword" style="width: 0%"></div>
-                </div>
-              </div>
-            </div>
-
+          <!-- DANGER -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">Danger Zone</p>
+            <button id="clearBtn"
+              class="w-full py-2 rounded-xl text-xs font-semibold border border-red-800 bg-red-900/30 text-red-400 hover:bg-red-900/50 transition-colors">
+              🗑  Clear All Data
+            </button>
           </div>
+
+          <!-- ABOUT -->
+          <div class="text-center text-xs dark:text-d-dim py-2 border-t dark:border-d-border mt-1">
+            <div class="font-semibold dark:text-d-text">QuickPaste v0.1.0</div>
+            <div>© 2026 Emir Han Mamak · Mamak Studio</div>
+            <div class="mt-1 text-[10px] opacity-60">Ctrl+K — Command Palette</div>
+          </div>
+
         </div>
-
-      </div><!-- /#panelTrack -->
-    </div><!-- /#bodyArea -->
-
-    <!-- Footer Frame -->
-    <div id="footerFrame">
-      <span id="resultLabel">0 snippets</span>
-      <span id="stackBadge" class="hidden" style="margin-left: 10px; background: var(--primary); color: #ffffff; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;" title="Click to paste next item in stack (Sıralı Yapıştır)">📚 <span id="stackCount">0</span> left</span>
-      <div class="spacer"></div>
-      <button id="addBtn" class="footer-btn" title="Add Snippet">+</button>
-    </div>
-  </div><!-- /#mainContainer -->
-
-  <!-- Snippet Form Dialog Overlay (Modal) -->
-  <div id="dialogOverlay" class="hidden">
-    <div class="dialog-container">
-      <div class="dialog-header">
-        <button id="dialogBackBtn" class="dialog-back-btn">←</button>
-        <span id="dialogTitle">Add Snippet</span>
       </div>
-      <div class="dialog-content">
-        <label class="field-label">TITLE</label>
-        <input type="text" id="dialogTitleInput" class="dialog-input" placeholder="Snippet name…">
 
-        <label class="field-label">CONTENT</label>
-        <textarea id="dialogContentInput" class="dialog-input code-input" placeholder="Type or paste content…"></textarea>
-        <div class="char-counter"><span id="charCount">0</span> characters</div>
+      <!-- ─────────────────────────────────── PANEL 3: DASHBOARD -->
+      <div id="dashboardScroll" class="dark:bg-d-bg overflow-y-auto pb-14">
+        <div class="p-4 flex flex-col gap-5">
 
-        <div class="dialog-row">
-          <div class="dialog-col">
-            <label class="field-label">SHORTCUT (click &amp; press keys)</label>
-            <div class="shortcut-input-container">
-              <input type="text" id="dialogShortcutInput" class="dialog-input" placeholder="None" readonly>
-              <button id="dialogClearShortcutBtn" class="dialog-clear-shortcut-btn" type="button">✕</button>
+          <!-- Header -->
+          <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Dashboard &amp; Stats</p>
+
+          <!-- 3 Stat Cards -->
+          <div class="grid grid-cols-3 gap-2">
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col items-center text-center hover:dark:border-d-primary transition-colors">
+              <span class="text-2xl font-bold text-d-primary" id="statTotalPastes">0</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider dark:text-d-dim mt-1">Total Pastes</span>
             </div>
-            <div id="shortcutGlobalWarning" class="shortcut-warn hidden">⚠ In-app only (non-standard key)</div>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col items-center text-center hover:dark:border-d-primary transition-colors">
+              <span class="text-2xl font-bold text-d-primary" id="statTimeSaved">0m</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider dark:text-d-dim mt-1">Time Saved</span>
+            </div>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col items-center text-center hover:dark:border-d-primary transition-colors">
+              <span class="text-2xl font-bold text-d-primary" id="statTotalChars">0</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider dark:text-d-dim mt-1">Chars Copied</span>
+            </div>
           </div>
-          <div class="dialog-col">
-            <label class="field-label">TYPE</label>
-            <select id="dialogTypeInput" class="dialog-input dialog-select">
+
+          <!-- Most Used -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">🔥 Most Used Snippets</p>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl overflow-hidden">
+              <ul id="statTopSnippetsList" class="divide-y dark:divide-d-border">
+                <!-- Rendered by JS -->
+              </ul>
+            </div>
+          </div>
+
+          <!-- 7-Day Activity -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2 flex items-center gap-1">
+              <span class="material-symbols-outlined text-d-primary" style="font-size:14px;">monitoring</span>
+              7-Day Activity
+            </p>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 h-36 flex items-end gap-2 px-4 pb-2">
+              <div id="statActivityBars" class="flex items-end gap-2 w-full h-full">
+                <!-- Rendered by JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Metrics Breakdown -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2 flex items-center gap-1">
+              <span class="material-symbols-outlined text-d-primary" style="font-size:14px;">pie_chart</span>
+              Metrics Breakdown
+            </p>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col gap-3">
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="dark:text-d-text">Text Snippets</span>
+                </div>
+                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
+                  <div id="barTypeText" class="breakdown-bar-fill bg-blue-400" style="width:0%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="dark:text-d-text">Code Snippets</span>
+                </div>
+                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
+                  <div id="barTypeCode" class="breakdown-bar-fill bg-green-400" style="width:0%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="dark:text-d-text">URLs</span>
+                </div>
+                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
+                  <div id="barTypeUrl" class="breakdown-bar-fill bg-purple-400" style="width:0%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="dark:text-d-text">Passwords</span>
+                </div>
+                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
+                  <div id="barTypePassword" class="breakdown-bar-fill bg-orange-400" style="width:0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /#panelTrack -->
+  </div><!-- /#bodyArea -->
+
+  <!-- ═══════════════════════════════════════════════════════ FOOTER -->
+  <footer id="footerFrame" class="flex items-center px-4 py-2.5 border-t dark:border-d-border shrink-0 relative dark:bg-d-bg">
+    <span id="resultLabel" class="text-xs dark:text-d-dim">0 snippets</span>
+    <!-- Paste stack badge -->
+    <span id="stackBadge" class="hidden ml-2 bg-d-primary text-black px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer flex items-center gap-1" title="Click to paste next in stack">
+      📚 <span id="stackCount">0</span> left
+    </span>
+    <div class="flex-1"></div>
+    <!-- FAB Add Button -->
+    <button id="addBtn" title="Add Snippet"
+      class="w-10 h-10 rounded-full bg-d-primary text-black shadow-lg flex items-center justify-center hover:opacity-90 transition-all active:scale-95 z-10">
+      <span class="material-symbols-outlined font-bold" style="font-size:24px;">add</span>
+    </button>
+  </footer>
+
+</div><!-- /#mainContainer -->
+
+
+<!-- ═══════════════════════════════════════════════════════ DIALOG OVERLAY -->
+<div id="dialogOverlay" class="hidden">
+  <div class="w-full max-w-[480px] dark:bg-d-card rounded-xl shadow-2xl flex flex-col overflow-hidden border dark:border-d-border max-h-[90vh]">
+
+    <!-- Dialog Header -->
+    <div class="px-5 py-3.5 flex items-center gap-3 border-b dark:border-d-border shrink-0">
+      <button id="dialogBackBtn"
+        class="text-d-dim hover:text-d-text transition-colors">
+        <span class="material-symbols-outlined" style="font-size:20px;">arrow_back</span>
+      </button>
+      <h2 id="dialogTitle" class="text-base font-bold dark:text-d-text">Add Snippet</h2>
+    </div>
+
+    <!-- Dialog Body (scrollable) -->
+    <div class="dialog-content px-5 py-4 flex flex-col gap-3.5 overflow-y-auto flex-1">
+
+      <!-- Title -->
+      <div class="flex flex-col gap-1">
+        <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Title</label>
+        <input type="text" id="dialogTitleInput" placeholder="Snippet name…"
+          class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-sans placeholder:dark:text-d-dim/50"/>
+      </div>
+
+      <!-- Content -->
+      <div class="flex flex-col gap-1">
+        <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Content</label>
+        <textarea id="dialogContentInput" placeholder="Type or paste content…" rows="4"
+          class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none dark:focus:border-d-primary transition-colors resize-none placeholder:dark:text-d-dim/50"></textarea>
+        <div class="char-counter"><span id="charCount">0</span> characters</div>
+      </div>
+
+      <!-- Row: Shortcut + Type -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim leading-tight">Shortcut (click &amp; press)</label>
+          <div class="relative">
+            <input type="text" id="dialogShortcutInput" readonly placeholder="None"
+              class="w-full dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-lg px-3 pr-7 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors cursor-pointer font-sans"/>
+            <button id="dialogClearShortcutBtn" type="button"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-d-dim hover:text-d-text text-xs">✕</button>
+          </div>
+          <div id="shortcutGlobalWarning" class="shortcut-warn hidden">⚠ In-app only (non-standard key)</div>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim leading-tight">Type</label>
+          <div class="relative">
+            <select id="dialogTypeInput"
+              class="w-full dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg pl-7 pr-6 py-2 text-sm focus:outline-none dark:focus:border-d-primary appearance-none cursor-pointer font-sans">
               <option value="text">📝 Text</option>
               <option value="code">💻 Code</option>
               <option value="url">🔗 URL</option>
               <option value="password">🔒 Password</option>
             </select>
+            <span class="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-d-dim pointer-events-none" style="font-size:18px;">arrow_drop_down</span>
           </div>
         </div>
+      </div>
 
-        <div class="dialog-row">
-          <div class="dialog-col">
-            <label class="field-label">PROJECT / CATEGORY</label>
-            <input type="text" id="dialogCategoryInput" class="dialog-input" placeholder="e.g., MamakSDK Vault">
-          </div>
-          <div class="dialog-col" style="flex: 0.8;">
-            <label class="field-label">EXPANSION TRIGGER</label>
-            <input type="text" id="dialogTriggerInput" class="dialog-input" placeholder="e.g., :email" title="Abbreviation that auto-expands into this snippet">
-          </div>
+      <!-- Row: Category + Trigger -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Project / Category</label>
+          <input type="text" id="dialogCategoryInput" placeholder="e.g., MamakSDK Vault"
+            class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary font-sans placeholder:dark:text-d-dim/50"/>
         </div>
-
-        <div class="dialog-row">
-          <div class="dialog-col" style="flex: 1.5;">
-            <label class="field-label">TAGS (comma-separated)</label>
-            <input type="text" id="dialogTagsInput" class="dialog-input" placeholder="e.g., code, vault">
-          </div>
-          <div class="dialog-col">
-            <label class="field-label">FAVORITE SLOT</label>
-            <select id="dialogSlotInput" class="dialog-input dialog-select">
-              <option value="">None</option>
-              <option value="1">1 (Alt+1)</option>
-              <option value="2">2 (Alt+2)</option>
-              <option value="3">3 (Alt+3)</option>
-              <option value="4">4 (Alt+4)</option>
-              <option value="5">5 (Alt+5)</option>
-              <option value="6">6 (Alt+6)</option>
-              <option value="7">7 (Alt+7)</option>
-              <option value="8">8 (Alt+8)</option>
-              <option value="9">9 (Alt+9)</option>
-            </select>
-          </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Expansion Trigger</label>
+          <input type="text" id="dialogTriggerInput" placeholder="e.g., :email" title="Abbreviation that auto-expands"
+            class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary font-sans placeholder:dark:text-d-dim/50"/>
         </div>
+      </div>
 
-        <!-- Color picker row -->
-        <label class="field-label">COLOR LABEL</label>
-        <div class="color-picker-row" id="colorPickerRow">
-          <button class="color-dot-btn" data-color="" title="None">✕</button>
+      <!-- Row: Tags + Emoji + Slot -->
+      <div class="grid grid-cols-[1fr_60px_auto] gap-3">
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Tags (comma-separated)</label>
+          <input type="text" id="dialogTagsInput" placeholder="code, vault"
+            class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary font-sans placeholder:dark:text-d-dim/50"/>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Emoji</label>
+          <input type="text" id="dialogEmojiInput" placeholder="🔥" maxlength="4"
+            class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-2 py-2 text-lg text-center focus:outline-none dark:focus:border-d-primary font-sans"/>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Slot</label>
+          <select id="dialogSlotInput"
+            class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-2 py-2 text-xs focus:outline-none dark:focus:border-d-primary appearance-none cursor-pointer font-sans">
+            <option value="">None</option>
+            <option value="1">1 (Alt+1)</option>
+            <option value="2">2 (Alt+2)</option>
+            <option value="3">3 (Alt+3)</option>
+            <option value="4">4 (Alt+4)</option>
+            <option value="5">5 (Alt+5)</option>
+            <option value="6">6 (Alt+6)</option>
+            <option value="7">7 (Alt+7)</option>
+            <option value="8">8 (Alt+8)</option>
+            <option value="9">9 (Alt+9)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Macro Chain -->
+      <div class="flex flex-col gap-1">
+        <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim" title="Comma-separated: snippet titles, 'tab', 'enter', 'space', 'delay:200'">
+          Macro Chain <span class="font-normal normal-case tracking-normal text-[9px] dark:text-d-dim opacity-70">(optional)</span>
+        </label>
+        <input type="text" id="dialogChainInput" placeholder="Step 1, tab, Step 2, enter…"
+          class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none dark:focus:border-d-primary placeholder:dark:text-d-dim/50"/>
+      </div>
+
+      <!-- Color Label -->
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Color Label</label>
+        <div class="flex items-center gap-2.5" id="colorPickerRow">
+          <button class="color-dot-btn dark:border-d-border dark:text-d-dim border" data-color="" title="None">✕</button>
           <button class="color-dot-btn" data-color="#ef4444" style="background:#ef4444" title="Red"></button>
           <button class="color-dot-btn" data-color="#f97316" style="background:#f97316" title="Orange"></button>
           <button class="color-dot-btn" data-color="#eab308" style="background:#eab308" title="Yellow"></button>
@@ -358,41 +865,91 @@
           <button class="color-dot-btn" data-color="#ec4899" style="background:#ec4899" title="Pink"></button>
         </div>
         <input type="hidden" id="dialogColorInput" value="">
+      </div>
 
-        <div class="secret-toggle-row">
-          <label class="secret-toggle-label" for="dialogSecretToggle">
-            <span class="secret-icon">🔒</span>
-            <span class="secret-label-text">Hide content (secret / password)</span>
-          </label>
-          <label class="switch">
-            <input type="checkbox" id="dialogSecretToggle">
-            <span class="slider"></span>
-          </label>
+      <!-- Secret toggle -->
+      <div class="dark:bg-d-input border dark:border-d-border rounded-xl px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="text-yellow-400">🔒</span>
+          <span class="font-medium text-sm dark:text-d-text">Hide content (secret / password)</span>
         </div>
+        <label class="qp-switch"><input type="checkbox" id="dialogSecretToggle"><span class="qp-slider"></span></label>
       </div>
-      <div class="dialog-footer">
-        <button id="dialogCancelBtn" class="dialog-cancel-btn">Cancel</button>
-        <button id="dialogSaveBtn" class="dialog-save-btn">Save  ✓</button>
-      </div>
+
+    </div>
+
+    <!-- Dialog Footer -->
+    <div class="px-5 py-3 flex items-center justify-end gap-3 border-t dark:border-d-border shrink-0 dark:bg-d-card">
+      <button id="dialogCancelBtn"
+        class="px-4 py-2 text-xs font-semibold dark:text-d-dim hover:dark:text-d-text transition-colors">
+        Cancel
+      </button>
+      <button id="dialogSaveBtn"
+        class="px-5 py-2 rounded-lg bg-d-primary text-black font-semibold text-xs hover:opacity-90 transition-opacity flex items-center gap-1">
+        Save <span class="material-symbols-outlined" style="font-size:16px;">check</span>
+      </button>
     </div>
   </div>
+</div>
 
-  <!-- Placeholder Filler Modal -->
-  <div id="placeholderOverlay" class="hidden">
-    <div class="dialog-container placeholder-dialog">
-      <div class="dialog-header" style="padding: 12px 16px 8px 16px;">
-        <span class="dialog-title" style="font-size: 13px; font-weight: 600;">Fill Placeholders</span>
-      </div>
-      <div class="dialog-body" id="placeholderFieldsContainer" style="padding: 0 16px 12px 16px; display: flex; flex-direction: column; gap: 8px;">
-        <!-- Fields generated dynamically by JS -->
-      </div>
-      <div class="dialog-footer" style="height: 44px; padding: 0 16px; border-top: 1px solid var(--outline-variant);">
-        <button id="placeholderCancelBtn" class="dialog-cancel-btn">Cancel</button>
-        <button id="placeholderPasteBtn" class="dialog-save-btn" style="padding: 6px 14px;">Paste  ✓</button>
-      </div>
+
+<!-- ═══════════════════════════════════════════════════════ PLACEHOLDER MODAL -->
+<div id="placeholderOverlay" class="hidden fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+  <div class="w-full max-w-sm bg-d-card border border-d-border rounded-xl shadow-2xl overflow-hidden">
+    <div class="px-5 py-3.5 border-b dark:border-d-border">
+      <span class="font-semibold dark:text-d-text text-sm">Fill Placeholders</span>
+    </div>
+    <div id="placeholderFieldsContainer" class="px-5 py-4 flex flex-col gap-3">
+      <!-- Generated by JS -->
+    </div>
+    <div class="px-5 py-3 flex items-center justify-end gap-3 border-t dark:border-d-border">
+      <button id="placeholderCancelBtn"
+        class="px-4 py-1.5 text-xs font-semibold dark:text-d-dim hover:dark:text-d-text transition-colors">
+        Cancel
+      </button>
+      <button id="placeholderPasteBtn"
+        class="px-4 py-1.5 rounded-lg bg-d-primary text-black font-semibold text-xs hover:opacity-90 flex items-center gap-1">
+        Paste <span class="material-symbols-outlined" style="font-size:15px;">check</span>
+      </button>
     </div>
   </div>
+</div>
 
-  <script src="/main.js" type="module"></script>
+
+<!-- ═══════════════════════════════════════════════════════ COMMAND PALETTE -->
+<div id="commandPaletteOverlay" class="hidden flex items-start justify-center pt-[15vh] fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm">
+  <div id="paletteContainer" class="w-full max-w-[480px] bg-d-card rounded-xl shadow-2xl border border-d-border flex flex-col overflow-hidden">
+    <div class="px-3 py-2 border-b border-d-border flex items-center gap-2">
+      <span class="material-symbols-outlined text-d-dim">search</span>
+      <input type="text" id="paletteInput" placeholder="Type a command..." class="w-full bg-transparent border-none text-d-text text-sm focus:outline-none placeholder:text-d-dim/50 font-sans"/>
+    </div>
+    <div id="paletteResults" class="flex flex-col max-h-[300px] overflow-y-auto">
+      <!-- Generated by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ QUICK LOOK -->
+<div id="quickLookOverlay" class="hidden fixed inset-0 z-[110] bg-black/70 backdrop-blur-md flex items-center justify-center p-6">
+  <div class="w-full max-w-[600px] max-h-[85vh] bg-d-bg rounded-xl shadow-2xl border border-d-border flex flex-col overflow-hidden relative">
+    <div class="absolute top-3 right-3 z-10 flex gap-2">
+      <button class="w-8 h-8 rounded-full bg-black/50 text-d-dim hover:text-d-text hover:bg-black/80 flex items-center justify-center transition-colors shadow" title="Copy (Ctrl+C)">
+        <span class="material-symbols-outlined" style="font-size:16px;">content_copy</span>
+      </button>
+      <button id="quickLookClose" class="w-8 h-8 rounded-full bg-black/50 text-d-dim hover:text-d-text hover:bg-black/80 flex items-center justify-center transition-colors shadow">
+        <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+      </button>
+    </div>
+    <div id="quickLookPanel" class="flex-1 overflow-auto p-6 font-mono text-xs text-d-text whitespace-pre-wrap select-text selection:bg-d-primary selection:text-black">
+      <!-- Generated by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TRANSFORM SUBMENU -->
+<div id="transformSubmenu" class="hidden"></div>
+
+
+<script src="/main.js" type="module"></script>
 </body>
 </html>
