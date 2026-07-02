@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuickPaste</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="mainContainer">
+    <!-- Header (JS drag region) -->
+    <div id="headerFrame">
+      <div id="appTitle">QuickPaste</div>
+      <div class="spacer"></div>
+      <button id="pinWindowBtn" class="header-btn" title="Toggle Pinned Mode">📌</button>
+      <button id="settingsBtn" class="header-btn" title="Toggle Settings">⚙</button>
+      <button id="closeBtn" class="header-btn" title="Close Window">✕</button>
+    </div>
+
+    <!--
+      Body Area: A horizontal "panel track" that slides left/right.
+      - When settings is CLOSED: shows listPanel (x=0)
+      - When settings is OPEN:   slides left to show settingsPanel (x=-50%)
+      The track is 200% wide containing two equal panels.
+      overflow: hidden on #bodyArea clips it cleanly.
+    -->
+    <div id="bodyArea">
+      <div id="panelTrack">
+
+        <!-- Panel 1: Search + Snippet List -->
+        <div id="listPanel">
+          <div id="searchFrame">
+            <div class="search-row">
+              <input type="text" id="searchInput" placeholder="Search snippets…" autocomplete="off">
+              <select id="categoryFilter">
+                <option value="All">All</option>
+              </select>
+            </div>
+          </div>
+          <div id="scrollArea">
+            <div id="listContainer">
+              <!-- Snippets populated via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 2: Settings -->
+        <div id="settingsScroll">
+          <div class="settings-content">
+            <!-- Hotkey Card -->
+            <div class="section-header">HOTKEY</div>
+            <div class="settings-card">
+              <div class="card-title-row">
+                <span class="card-icon">⌨</span>
+                <span class="card-title">Global Shortcut</span>
+              </div>
+              <div class="kbd-row" id="hotkeyKeysRow">
+                <!-- Populated dynamically -->
+              </div>
+              <div class="card-desc">Summon QuickPaste from anywhere.</div>
+            </div>
+
+            <!-- Preferences -->
+            <div class="section-header">PREFERENCES</div>
+            <div class="settings-card toggle-card">
+              <div class="toggle-info">
+                <div class="card-title-row">
+                  <span class="card-icon">⚡</span>
+                  <span class="card-title">Default Auto-Paste</span>
+                </div>
+                <div class="card-desc">Automatically paste selected item.</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="autoPasteToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <!-- Appearance -->
+            <div class="section-header">APPEARANCE</div>
+            <div class="settings-card toggle-card">
+              <div class="toggle-info">
+                <div class="card-title-row">
+                  <span class="card-icon">🌙</span>
+                  <span class="card-title">Dark Mode</span>
+                </div>
+                <div class="card-desc">Switch to dark color theme.</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="darkModeToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <!-- Clipboard -->
+            <div class="section-header">CLIPBOARD</div>
+            <div class="settings-card toggle-card">
+              <div class="toggle-info">
+                <div class="card-title-row">
+                  <span class="card-icon">📋</span>
+                  <span class="card-title">Clipboard History</span>
+                </div>
+                <div class="card-desc">Auto-capture everything you copy.</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="clipboardHistoryToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <!-- Storage & Actions -->
+            <div class="section-header">STORAGE</div>
+            <div class="settings-card">
+              <div class="card-title-row">
+                <span class="card-icon">📁</span>
+                <span class="card-title">Storage Path</span>
+              </div>
+              <div class="path-field" id="storagePathLabel">Loading path...</div>
+              <div class="ie-row">
+                <button id="exportBtn" class="ie-btn">Export Data</button>
+                <button id="importBtn" class="ie-btn">Import Data</button>
+              </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <button id="clearBtn">🗑  Clear All Data</button>
+          </div>
+        </div>
+
+      </div><!-- /#panelTrack -->
+    </div><!-- /#bodyArea -->
+
+    <!-- Footer Frame -->
+    <div id="footerFrame">
+      <span id="resultLabel">0 snippets</span>
+      <div class="spacer"></div>
+      <button id="addBtn" class="footer-btn" title="Add Snippet">+</button>
+    </div>
+  </div><!-- /#mainContainer -->
+
+  <!-- Snippet Form Dialog Overlay (Modal) -->
+  <div id="dialogOverlay" class="hidden">
+    <div class="dialog-container">
+      <div class="dialog-header">
+        <button id="dialogBackBtn" class="dialog-back-btn">←</button>
+        <span id="dialogTitle">Add Snippet</span>
+      </div>
+      <div class="dialog-content">
+        <label class="field-label">TITLE</label>
+        <input type="text" id="dialogTitleInput" class="dialog-input" placeholder="Snippet name…">
+
+        <label class="field-label">CONTENT</label>
+        <textarea id="dialogContentInput" class="dialog-input code-input" placeholder="Type or paste content…"></textarea>
+        <div class="char-counter"><span id="charCount">0</span> characters</div>
+
+        <div class="dialog-row">
+          <div class="dialog-col">
+            <label class="field-label">SHORTCUT (press keys to set)</label>
+            <div class="shortcut-input-container">
+              <input type="text" id="dialogShortcutInput" class="dialog-input" placeholder="None (Click & Press keys)" readonly>
+              <button id="dialogClearShortcutBtn" class="dialog-clear-shortcut-btn" type="button">✕</button>
+            </div>
+          </div>
+          <div class="dialog-col">
+            <label class="field-label">TYPE</label>
+            <select id="dialogTypeInput" class="dialog-input dialog-select">
+              <option value="text">📝 Text</option>
+              <option value="code">💻 Code</option>
+              <option value="url">🔗 URL</option>
+              <option value="password">🔒 Password</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="dialog-row">
+          <div class="dialog-col">
+            <label class="field-label">PROJECT / CATEGORY</label>
+            <input type="text" id="dialogCategoryInput" class="dialog-input" placeholder="e.g., MamakSDK Vault">
+          </div>
+          <div class="dialog-col">
+            <label class="field-label">TAGS (comma-separated)</label>
+            <input type="text" id="dialogTagsInput" class="dialog-input" placeholder="e.g., code, vault">
+          </div>
+        </div>
+
+        <div class="secret-toggle-row">
+          <label class="secret-toggle-label" for="dialogSecretToggle">
+            <span class="secret-icon">🔒</span>
+            <span class="secret-label-text">Hide content (secret / password)</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="dialogSecretToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="dialogCancelBtn" class="dialog-cancel-btn">Cancel</button>
+        <button id="dialogSaveBtn" class="dialog-save-btn">Save  ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/main.js" type="module"></script>
+</body>
+</html>
