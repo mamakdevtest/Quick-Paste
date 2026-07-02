@@ -31,6 +31,12 @@ pub struct Snippet {
     /// Optional trigger abbreviation for text expansion (e.g. ":email")
     #[serde(default)]
     pub trigger: Option<String>,
+    /// Optional favorite slot (1-9) for global Alt+1..9 hotkeys
+    #[serde(default)]
+    pub slot: Option<u8>,
+    /// Optional executable name of the application the snippet was copied from
+    #[serde(default)]
+    pub source_app: Option<String>,
 }
 
 fn default_snippet_type() -> String {
@@ -45,6 +51,12 @@ pub struct Settings {
     pub clipboard_history_enabled: bool,
     pub startup_with_os: bool,
     pub hotkey: String,
+    #[serde(default = "default_history_days")]
+    pub clipboard_history_duration_days: u32,
+}
+
+fn default_history_days() -> u32 {
+    30
 }
 
 impl Default for Settings {
@@ -55,6 +67,7 @@ impl Default for Settings {
             clipboard_history_enabled: false,
             startup_with_os: false,
             hotkey: "alt+q".to_string(),
+            clipboard_history_duration_days: 30,
         }
     }
 }
@@ -98,22 +111,50 @@ pub fn load_snippets() -> Vec<Snippet> {
                 created_at: 0,
                 last_used_at: 0,
                 trigger: None,
+                slot: None,
+                source_app: None,
             }
         ];
         save_snippets(&defaults);
         return defaults;
     }
 
-    let mut file = match File::open(&path) {
-        Ok(f) => f,
-        Err(_) => return Vec::new(),
-    };
-    let mut content = String::new();
-    if file.read_to_string(&mut content).is_ok() {
-        serde_json::from_str(&content).unwrap_or_else(|_| Vec::new())
+    let mut list: Vec<Snippet> = if let Ok(mut file) = File::open(&path) {
+        let mut content = String::new();
+        if file.read_to_string(&mut content).is_ok() {
+            serde_json::from_str(&content).unwrap_or_else(|_| Vec::new())
+        } else {
+            Vec::new()
+        }
     } else {
         Vec::new()
+    };
+
+    // Auto-clean old clipboard history
+    let settings = load_settings();
+    if settings.clipboard_history_duration_days > 0 {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        let threshold_ms = (settings.clipboard_history_duration_days as u64) * 24 * 60 * 60 * 1000;
+        if now > threshold_ms {
+            let cutoff = now - threshold_ms;
+            let original_len = list.len();
+            list.retain(|s| {
+                if s.category.as_deref() == Some("Clipboard") {
+                    s.created_at >= cutoff
+                } else {
+                    true
+                }
+            });
+            if list.len() != original_len {
+                save_snippets(&list);
+            }
+        }
     }
+
+    list
 }
 
 pub fn save_snippets(snippets: &[Snippet]) {

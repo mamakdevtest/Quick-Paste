@@ -14,6 +14,10 @@ mod clipboard_manager;
 mod clipboard_monitor;
 mod data_store;
 
+#[cfg(target_os = "windows")]
+mod keyboard_hook;
+
+
 use data_store::{Snippet, Settings};
 
 struct AppState {
@@ -60,12 +64,23 @@ fn reregister_all_shortcuts(app: &AppHandle) -> Result<(), String> {
 
     // Register all snippet custom shortcuts
     let snippets = data_store::load_snippets();
-    for snippet in snippets {
+    for snippet in &snippets {
         if let Some(ref sc) = snippet.shortcut {
             if !sc.trim().is_empty() {
                 let formatted = format_hotkey(sc);
                 if let Ok(shortcut) = Shortcut::from_str(&formatted) {
-                    // Try to register (might fail if already registered or occupied)
+                    let _ = global_shortcut.register(shortcut);
+                }
+            }
+        }
+    }
+
+    // Register Alt+1..9 favorite slots
+    for snippet in &snippets {
+        if let Some(slot) = snippet.slot {
+            if slot >= 1 && slot <= 9 {
+                let formatted = format!("Alt+{}", slot);
+                if let Ok(shortcut) = Shortcut::from_str(&formatted) {
                     let _ = global_shortcut.register(shortcut);
                 }
             }
@@ -98,6 +113,7 @@ fn load_snippets() -> Vec<Snippet> {
 #[tauri::command]
 fn save_snippets(app: AppHandle, snippets: Vec<Snippet>) {
     data_store::save_snippets(&snippets);
+    sync_triggers(&snippets);
     let _ = reregister_all_shortcuts(&app);
 }
 
@@ -244,6 +260,7 @@ fn import_data(app: AppHandle) -> Result<Option<ImportedData>, String> {
 
     data_store::save_snippets(&snippets);
     data_store::save_settings(&settings);
+    sync_triggers(&snippets);
 
     let _ = reregister_all_shortcuts(&app);
 
@@ -260,6 +277,7 @@ struct ImportedData {
 fn clear_all_data(app: AppHandle) {
     data_store::save_snippets(&[]);
     data_store::save_settings(&Settings::default());
+    sync_triggers(&[]);
     let _ = reregister_all_shortcuts(&app);
 }
 
@@ -361,17 +379,31 @@ pub fn run() {
 
                         // Check if one of the snippet custom hotkeys is pressed
                         let snippets = data_store::load_snippets();
-                        for snippet in snippets {
+                        for snippet in &snippets {
                             if let Some(ref sc) = snippet.shortcut {
                                 if !sc.trim().is_empty() {
                                     let formatted = format_hotkey(sc);
                                     if let Ok(snippet_shortcut) = Shortcut::from_str(&formatted) {
                                         if shortcut == &snippet_shortcut {
                                             let state = app.state::<AppState>();
-                                            // The active window right now is the user's target editor window.
-                                            // We paste the snippet directly into it.
-                                            copy_and_paste(state, snippet.content, None, false);
-                                            break;
+                                            copy_and_paste(state, snippet.content.clone(), None, false);
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Check if one of the snippet favorite slot Alt+1..9 hotkeys is pressed
+                        for snippet in &snippets {
+                            if let Some(slot) = snippet.slot {
+                                if slot >= 1 && slot <= 9 {
+                                    let formatted = format!("Alt+{}", slot);
+                                    if let Ok(slot_shortcut) = Shortcut::from_str(&formatted) {
+                                        if shortcut == &slot_shortcut {
+                                            let state = app.state::<AppState>();
+                                            copy_and_paste(state, snippet.content.clone(), None, false);
+                                            return;
                                         }
                                     }
                                 }
@@ -397,6 +429,12 @@ pub fn run() {
                 let monitor = state.monitor.lock().unwrap();
                 monitor.start(app.handle().clone());
             }
+
+            // Sync triggers and start low-level keyboard hook on Windows
+            let snippets = data_store::load_snippets();
+            sync_triggers(&snippets);
+            #[cfg(target_os = "windows")]
+            keyboard_hook::start_keyboard_hook();
 
             // Register all global shortcuts (main toggle + snippet shortcuts)
             let _ = reregister_all_shortcuts(app.handle());
@@ -479,3 +517,24 @@ fn format_hotkey(hotkey: &str) -> String {
         .collect::<Vec<String>>()
         .join("+")
 }
+
+fn sync_triggers(snippets: &[data_store::Snippet]) {
+    #[cfg(target_os = "windows")]
+    {
+        let list: Vec<(String, String)> = snippets
+            .iter()
+            .filter_map(|s| {
+                s.trigger.as_ref().and_then(|t| {
+                    let trimmed = t.trim();
+                    if !trimmed.is_empty() {
+                        Some((trimmed.to_string(), s.content.clone()))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
+        keyboard_hook::update_triggers(list);
+    }
+}
+

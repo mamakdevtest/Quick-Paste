@@ -39,6 +39,42 @@ pub fn is_system_window(hwnd_val: isize) -> bool {
     false
 }
 
+#[cfg(target_os = "windows")]
+pub fn get_active_process_name() -> String {
+    use windows_sys::Win32::System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION};
+    use windows_sys::Win32::Foundation::CloseHandle;
+
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd == std::ptr::null_mut() {
+            return "Unknown".to_string();
+        }
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid == 0 {
+            return "Unknown".to_string();
+        }
+        
+        let process_handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if process_handle == std::ptr::null_mut() {
+            return "Unknown".to_string();
+        }
+        
+        let mut buffer = [0u16; 512];
+        let mut size = buffer.len() as u32;
+        let success = QueryFullProcessImageNameW(process_handle, 0, buffer.as_mut_ptr(), &mut size);
+        CloseHandle(process_handle);
+        
+        if success != 0 {
+            let path = String::from_utf16_lossy(&buffer[..size as usize]);
+            if let Some(filename) = path.split('\\').last() {
+                return filename.to_string();
+            }
+        }
+        "Unknown".to_string()
+    }
+}
+
 #[cfg(not(target_os = "windows"))]
 pub fn get_foreground_window() -> isize {
     // Linux active window capture via xdotool
@@ -55,6 +91,11 @@ pub fn get_foreground_window() -> isize {
 #[cfg(not(target_os = "windows"))]
 pub fn is_system_window(_hwnd_val: isize) -> bool {
     false
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn get_active_process_name() -> String {
+    "Unknown".to_string()
 }
 
 #[cfg(target_os = "windows")]

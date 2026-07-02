@@ -4,6 +4,22 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
+#[derive(serde::Serialize, Clone)]
+struct ClipboardPayload {
+    text: String,
+    source_app: String,
+}
+
+fn is_password_manager(proc_name: &str) -> bool {
+    let lower = proc_name.to_lowercase();
+    lower.contains("1password")
+        || lower.contains("bitwarden")
+        || lower.contains("keepass")
+        || lower.contains("dashlane")
+        || lower.contains("enpass")
+        || lower.contains("keeper")
+}
+
 pub struct ClipboardMonitor {
     running: Arc<AtomicBool>,
 }
@@ -37,9 +53,16 @@ impl ClipboardMonitor {
                     if let Ok(current) = clipboard.get_text() {
                         let trimmed = current.trim();
                         if !trimmed.is_empty() && current != last_text {
-                            last_text = current.clone();
-                            // Emit to frontend (listens on app window)
-                            let _ = app_handle.emit("new-clipboard-entry", current);
+                            let proc_name = crate::clipboard_manager::get_active_process_name();
+                            if !is_password_manager(&proc_name) {
+                                last_text = current.clone();
+                                let payload = ClipboardPayload {
+                                    text: current,
+                                    source_app: proc_name,
+                                };
+                                // Emit to frontend (listens on app window)
+                                let _ = app_handle.emit("new-clipboard-entry", payload);
+                            }
                         }
                     }
                 }
@@ -52,3 +75,4 @@ impl ClipboardMonitor {
         self.running.store(false, Ordering::SeqCst);
     }
 }
+

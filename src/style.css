@@ -174,21 +174,26 @@ body {
 #panelTrack {
   display: flex;
   flex-direction: row;
-  /* Two panels side by side, each 50% of track = 100% of bodyArea */
-  width: 200%;
+  /* Three panels side by side, each 33.333% of track = 100% of bodyArea */
+  width: 300%;
   height: 100%;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #panelTrack.settings-open {
   /* Slide left to reveal settings panel */
-  transform: translateX(-50%);
+  transform: translateX(-33.333%);
+}
+
+#panelTrack.dashboard-open {
+  /* Slide left to reveal dashboard panel */
+  transform: translateX(-66.666%);
 }
 
 /* ─── List Panel (Search + Snippet List) ─────────────────────────────────────── */
 #listPanel {
-  /* Each panel is 50% of the 200%-wide track = 100% of bodyArea */
-  width: 50%;
+  /* Each panel is 33.333% of the 300%-wide track = 100% of bodyArea */
+  width: 33.333%;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -477,6 +482,18 @@ body.dark .shortcut-color-2 { color: #93c5fd; background: #1e3a8a; }
 body.dark .shortcut-color-3 { color: #c4b5fd; background: #4c1d95; }
 body.dark .shortcut-color-4 { color: #f9a8d4; background: #831843; }
 
+.trigger-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--primary-fixed);
+  border: 1px dashed var(--primary);
+  padding: 0px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .snippet-content-preview {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -562,7 +579,7 @@ body.dark mark {
 
 /* ─── Settings Panel ─────────────────────────────────────────────────────────── */
 #settingsScroll {
-  width: 50%;
+  width: 33.333%;
   flex-shrink: 0;
   height: 100%;
   overflow-y: auto;
@@ -1374,4 +1391,196 @@ body.dark .secret-toggle-row:has(input:checked) {
   opacity: 0.6;
   text-align: center;
 }
+
+/* ─── Dashboard Panel ────────────────────────────────────────────────────────── */
+#dashboardScroll {
+  width: 33.333%;
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+  background: var(--surface);
+  overscroll-behavior: contain;
+}
+
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.db-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.db-card {
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.db-card-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+  font-family: var(--font-mono);
+}
+
+.db-card-label {
+  font-size: 8px;
+  color: var(--on-surface-variant);
+  text-align: center;
+  font-weight: 600;
+}
+
+.db-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--outline);
+  letter-spacing: 0.05em;
+  margin-top: 6px;
+}
+
+.db-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 6px;
+}
+
+.db-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  border-bottom: 1px solid var(--outline-variant);
+  padding: 4px 2px;
+}
+
+.db-list-item:last-child {
+  border-bottom: none;
+}
+
+.db-item-title {
+  font-weight: 600;
+  color: var(--on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
+}
+
+.db-item-count {
+  font-family: var(--font-mono);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.db-chart-container {
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 10px 8px;
+  height: 80px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.db-chart-bars {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+  height: 100%;
+  gap: 4px;
+}
+
+.db-chart-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.db-chart-bar-fill {
+  width: 14px;
+  background: var(--primary);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.4s ease;
+}
+
+.db-chart-bar-label {
+  font-size: 7px;
+  color: var(--outline);
+  font-family: var(--font-mono);
+}
+
+.db-breakdown-card {
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breakdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.breakdown-label {
+  font-size: 9px;
+  color: var(--on-surface-variant);
+  font-weight: 600;
+}
+
+.breakdown-bar-bg {
+  height: 6px;
+  background: var(--surface-container);
+  border-radius: 3px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.breakdown-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.4s ease;
+}
+
+/* ─── Placeholder Modal Overlay ─────────────────────────────────────────────── */
+#placeholderOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  backdrop-filter: blur(2px);
+}
+
 
