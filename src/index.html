@@ -8,7 +8,7 @@
 </head>
 <body>
   <div id="mainContainer">
-    <!-- Header (JS drag region) -->
+    <!-- Header -->
     <div id="headerFrame">
       <div id="appTitle">QuickPaste</div>
       <div class="spacer"></div>
@@ -17,13 +17,6 @@
       <button id="closeBtn" class="header-btn" title="Close Window">✕</button>
     </div>
 
-    <!--
-      Body Area: A horizontal "panel track" that slides left/right.
-      - When settings is CLOSED: shows listPanel (x=0)
-      - When settings is OPEN:   slides left to show settingsPanel (x=-50%)
-      The track is 200% wide containing two equal panels.
-      overflow: hidden on #bodyArea clips it cleanly.
-    -->
     <div id="bodyArea">
       <div id="panelTrack">
 
@@ -36,7 +29,28 @@
                 <option value="All">All</option>
               </select>
             </div>
+            <div class="toolbar-row">
+              <select id="sortSelect" title="Sort snippets">
+                <option value="default">📌 Default</option>
+                <option value="az">A → Z</option>
+                <option value="za">Z → A</option>
+                <option value="most_used">🔥 Most Used</option>
+                <option value="newest">🕐 Newest</option>
+                <option value="oldest">📅 Oldest</option>
+              </select>
+              <button id="clipboardImportBtn" class="toolbar-btn" title="Add snippet from clipboard">📋 From Clipboard</button>
+              <button id="multiSelectBtn" class="toolbar-btn" title="Multi-select mode">☑ Select</button>
+            </div>
           </div>
+
+          <!-- Multi-select bulk action bar -->
+          <div id="bulkActionBar" class="hidden">
+            <span id="selectedCount">0 selected</span>
+            <div class="spacer"></div>
+            <button id="bulkDeleteBtn" class="bulk-btn danger">🗑 Delete</button>
+            <button id="bulkCancelBtn" class="bulk-btn">✕ Cancel</button>
+          </div>
+
           <div id="scrollArea">
             <div id="listContainer">
               <!-- Snippets populated via JS -->
@@ -57,6 +71,10 @@
               <div class="kbd-row" id="hotkeyKeysRow">
                 <!-- Populated dynamically -->
               </div>
+              <div class="hotkey-capture-row">
+                <input type="text" id="hotkeyInput" class="hotkey-capture-input" placeholder="Click & press keys to set…" readonly>
+                <button id="hotkeyClearBtn" class="hotkey-clear-btn" title="Reset to default">↺</button>
+              </div>
               <div class="card-desc">Summon QuickPaste from anywhere.</div>
             </div>
 
@@ -75,6 +93,19 @@
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="settings-card toggle-card">
+              <div class="toggle-info">
+                <div class="card-title-row">
+                  <span class="card-icon">🚀</span>
+                  <span class="card-title">Start with Windows</span>
+                </div>
+                <div class="card-desc">Launch QuickPaste on login.</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="startupToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
 
             <!-- Appearance -->
             <div class="section-header">APPEARANCE</div>
@@ -90,6 +121,17 @@
                 <input type="checkbox" id="darkModeToggle">
                 <span class="slider"></span>
               </label>
+            </div>
+            <div class="settings-card">
+              <div class="card-title-row">
+                <span class="card-icon">💧</span>
+                <span class="card-title">Window Opacity</span>
+              </div>
+              <div class="opacity-row">
+                <input type="range" id="opacitySlider" min="30" max="100" value="100" step="5" class="opacity-slider">
+                <span id="opacityLabel" class="opacity-label">100%</span>
+              </div>
+              <div class="card-desc">Adjust window transparency.</div>
             </div>
 
             <!-- Clipboard -->
@@ -124,6 +166,13 @@
 
             <!-- Danger Zone -->
             <button id="clearBtn">🗑  Clear All Data</button>
+
+            <!-- About / Copyright -->
+            <div class="settings-about">
+              <div>QuickPaste v0.1.0</div>
+              <div>© 2026 Emir Han Mamak</div>
+              <div>Mamak Studio</div>
+            </div>
           </div>
         </div>
 
@@ -155,11 +204,12 @@
 
         <div class="dialog-row">
           <div class="dialog-col">
-            <label class="field-label">SHORTCUT (press keys to set)</label>
+            <label class="field-label">SHORTCUT (click &amp; press keys)</label>
             <div class="shortcut-input-container">
-              <input type="text" id="dialogShortcutInput" class="dialog-input" placeholder="None (Click & Press keys)" readonly>
+              <input type="text" id="dialogShortcutInput" class="dialog-input" placeholder="None" readonly>
               <button id="dialogClearShortcutBtn" class="dialog-clear-shortcut-btn" type="button">✕</button>
             </div>
+            <div id="shortcutGlobalWarning" class="shortcut-warn hidden">⚠ In-app only (non-standard key)</div>
           </div>
           <div class="dialog-col">
             <label class="field-label">TYPE</label>
@@ -182,6 +232,20 @@
             <input type="text" id="dialogTagsInput" class="dialog-input" placeholder="e.g., code, vault">
           </div>
         </div>
+
+        <!-- Color picker row -->
+        <label class="field-label">COLOR LABEL</label>
+        <div class="color-picker-row" id="colorPickerRow">
+          <button class="color-dot-btn" data-color="" title="None">✕</button>
+          <button class="color-dot-btn" data-color="#ef4444" style="background:#ef4444" title="Red"></button>
+          <button class="color-dot-btn" data-color="#f97316" style="background:#f97316" title="Orange"></button>
+          <button class="color-dot-btn" data-color="#eab308" style="background:#eab308" title="Yellow"></button>
+          <button class="color-dot-btn" data-color="#22c55e" style="background:#22c55e" title="Green"></button>
+          <button class="color-dot-btn" data-color="#3b82f6" style="background:#3b82f6" title="Blue"></button>
+          <button class="color-dot-btn" data-color="#a855f7" style="background:#a855f7" title="Purple"></button>
+          <button class="color-dot-btn" data-color="#ec4899" style="background:#ec4899" title="Pink"></button>
+        </div>
+        <input type="hidden" id="dialogColorInput" value="">
 
         <div class="secret-toggle-row">
           <label class="secret-toggle-label" for="dialogSecretToggle">

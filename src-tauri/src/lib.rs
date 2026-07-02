@@ -2,8 +2,13 @@ use std::sync::Mutex;
 use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+
+#[cfg(target_os = "windows")]
+use winreg::enums::*;
+#[cfg(target_os = "windows")]
+use winreg::RegKey;
 
 mod clipboard_manager;
 mod clipboard_monitor;
@@ -258,6 +263,56 @@ fn clear_all_data(app: AppHandle) {
     let _ = reregister_all_shortcuts(&app);
 }
 
+#[tauri::command]
+fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let run_key = hkcu
+            .open_subkey_with_flags(
+                "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                KEY_SET_VALUE,
+            )
+            .map_err(|e| e.to_string())?;
+
+        if enabled {
+            // Get the path to the current executable
+            let exe_path = std::env::current_exe()
+                .map_err(|e| e.to_string())?
+                .to_string_lossy()
+                .to_string();
+            run_key
+                .set_value("QuickPaste", &exe_path)
+                .map_err(|e| e.to_string())?;
+        } else {
+            // Remove if exists (ignore error if not present)
+            let _ = run_key.delete_value("QuickPaste");
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = enabled;
+    }
+
+    // Persist setting
+    let mut settings = data_store::load_settings();
+    settings.startup_with_os = enabled;
+    data_store::save_settings(&settings);
+    let _ = reregister_all_shortcuts(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_window_opacity(app: AppHandle, opacity: f64) {
+    if let Some(win) = app.get_webview_window("main") {
+        let clamped = opacity.clamp(0.3, 1.0) as f32;
+        // Tauri v2: set_shadow false, apply opacity via window effects not directly supported.
+        // We store opacity in settings and apply via JS webview style instead.
+        // Fallback: use JS-side body opacity set via emit.
+        let _ = win.emit("set-opacity", clamped);
+    }
+}
+
 /// Called from JS on the window `focus` event to record our own HWND,
 /// so we never treat it as a paste target.
 #[tauri::command]
@@ -404,6 +459,8 @@ pub fn run() {
             import_data,
             clear_all_data,
             store_own_hwnd,
+            set_autostart,
+            set_window_opacity,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

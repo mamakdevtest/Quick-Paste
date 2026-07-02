@@ -19,11 +19,24 @@ pub struct Snippet {
     /// Snippet type: "text" | "code" | "url" | "password"
     #[serde(default = "default_snippet_type")]
     pub snippet_type: String,
+    /// Optional color label hex string e.g. "#ef4444"
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Unix timestamp (ms) when snippet was created
+    #[serde(default)]
+    pub created_at: u64,
+    /// Unix timestamp (ms) when snippet was last used/pasted
+    #[serde(default)]
+    pub last_used_at: u64,
+    /// Optional trigger abbreviation for text expansion (e.g. ":email")
+    #[serde(default)]
+    pub trigger: Option<String>,
 }
 
 fn default_snippet_type() -> String {
     "text".to_string()
 }
+
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Settings {
@@ -81,6 +94,10 @@ pub fn load_snippets() -> Vec<Snippet> {
                 shortcut: None,
                 is_secret: false,
                 snippet_type: "text".to_string(),
+                color: None,
+                created_at: 0,
+                last_used_at: 0,
+                trigger: None,
             }
         ];
         save_snippets(&defaults);

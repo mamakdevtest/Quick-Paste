@@ -210,6 +210,94 @@ body {
   align-items: center;
 }
 
+/* ─── Toolbar Row (sort + actions) ───────────────────────────────────────────── */
+.toolbar-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+#sortSelect {
+  height: 26px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 5px;
+  padding: 0 5px;
+  font-size: 11px;
+  color: var(--on-surface);
+  outline: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  max-width: 110px;
+}
+
+.toolbar-btn {
+  height: 26px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 5px;
+  font-size: 10px;
+  font-family: var(--font-family);
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  padding: 0 7px;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.toolbar-btn:hover {
+  background: var(--surface-variant);
+  color: var(--primary);
+}
+
+.toolbar-btn.active {
+  background: var(--primary-fixed);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ─── Bulk Action Bar ────────────────────────────────────────────────────────── */
+#bulkActionBar {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--primary-fixed);
+  border-bottom: 1px solid var(--primary);
+  gap: 6px;
+  flex-shrink: 0;
+  animation: slideDown 0.15s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+#selectedCount {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.bulk-btn {
+  height: 24px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: var(--font-family);
+  color: var(--on-surface);
+  cursor: pointer;
+  padding: 0 8px;
+  transition: background 0.15s;
+}
+
+.bulk-btn:hover { background: var(--surface-variant); }
+.bulk-btn.danger { color: var(--error); border-color: var(--error); }
+.bulk-btn.danger:hover { background: var(--error-container); }
+
 #searchInput {
   flex-grow: 1;
   min-width: 0;           /* ← prevents flex overflow beyond container */
@@ -269,7 +357,6 @@ body {
   gap: 5px;
   position: relative;
   cursor: pointer;
-  /* Prevent card from expanding wider than its container */
   min-width: 0;
   overflow: hidden;
   transition: border-color 0.15s, background 0.15s;
@@ -280,11 +367,57 @@ body {
   background: var(--card-hover);
 }
 
+.snippet-item:hover .card-actions { opacity: 1; }
+
 .snippet-item.selected {
   border-color: var(--primary);
   background: var(--card-hover);
   outline: 1.5px solid var(--primary);
   outline-offset: -1px;
+}
+
+.snippet-item.multi-selected {
+  border-color: var(--primary);
+  background: var(--primary-fixed);
+  outline: 1.5px solid var(--primary);
+  outline-offset: -1px;
+}
+
+/* ─── Card Action Buttons (on hover) ─────────────────────────────────────────── */
+.card-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  display: flex;
+  gap: 4px;
+}
+
+.card-copy-btn {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 1px 5px;
+  cursor: pointer;
+  color: var(--on-surface-variant);
+  transition: background 0.12s, color 0.12s;
+  line-height: 1.5;
+}
+
+.card-copy-btn:hover {
+  background: var(--primary-fixed);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ─── Multi-select checkbox ──────────────────────────────────────────────────── */
+.multi-check {
+  font-size: 14px;
+  flex-shrink: 0;
+  color: var(--primary);
+  cursor: pointer;
 }
 
 .snippet-row-1 {
@@ -352,6 +485,39 @@ body.dark .shortcut-color-4 { color: #f9a8d4; background: #831843; }
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+/* ─── Search Highlight ───────────────────────────────────────────────────────── */
+mark {
+  background: #fef08a;
+  color: #78350f;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+body.dark mark {
+  background: #854d0e;
+  color: #fef08a;
+}
+
+/* ─── Snippet Meta Badges ────────────────────────────────────────────────────── */
+.char-badge {
+  font-size: 9px;
+  color: var(--outline);
+  background: var(--surface-container);
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+.time-ago {
+  font-size: 9px;
+  color: var(--outline);
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .snippet-meta-row {
@@ -479,6 +645,162 @@ body.dark .shortcut-color-4 { color: #f9a8d4; background: #831843; }
   border-bottom: 2px solid var(--outline);
   padding: 2px 8px;
   border-radius: 4px;
+}
+
+/* ─── Hotkey Capture Input ────────────────────────────────────────────────────── */
+.hotkey-capture-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.hotkey-capture-input {
+  flex-grow: 1;
+  height: 28px;
+  background: var(--surface-container-low);
+  border: 1px dashed var(--outline-variant);
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--on-surface);
+  outline: none;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.hotkey-capture-input:focus {
+  border-color: var(--primary);
+  border-style: solid;
+  background: var(--surface-lowest);
+}
+
+.hotkey-clear-btn {
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  border-radius: 4px;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 7px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.hotkey-clear-btn:hover {
+  background: var(--surface-variant);
+  color: var(--primary);
+}
+
+/* ─── Opacity Slider ──────────────────────────────────────────────────────────── */
+.opacity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.opacity-slider {
+  flex-grow: 1;
+  height: 4px;
+  appearance: none;
+  background: var(--outline-variant);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.opacity-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.opacity-label {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--on-surface-variant);
+  min-width: 34px;
+  text-align: right;
+}
+
+/* ─── Color Picker Row ────────────────────────────────────────────────────────── */
+.color-picker-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.color-dot-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-container);
+  color: var(--on-surface-variant);
+  transition: transform 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+}
+
+.color-dot-btn:hover { transform: scale(1.2); }
+.color-dot-btn.selected {
+  border-color: var(--on-surface);
+  transform: scale(1.15);
+}
+
+/* ─── Shortcut Global Warning ─────────────────────────────────────────────────── */
+.shortcut-warn {
+  font-size: 10px;
+  color: var(--pin-color);
+  margin-top: 2px;
+  font-style: italic;
+}
+
+/* ─── Template Grid ───────────────────────────────────────────────────────────── */
+.template-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 10px 8px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.template-card:hover {
+  background: var(--card-hover);
+  border-color: var(--primary);
+}
+
+.template-icon { font-size: 18px; }
+
+.template-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--on-surface);
+  text-align: center;
 }
 
 .path-field {
@@ -1037,3 +1359,19 @@ body.dark .secret-toggle-row:has(input:checked) {
   background: var(--error);
   color: #ffffff;
 }
+
+/* ─── Settings About Section ─────────────────────────────────────────────────── */
+.settings-about {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--outline-variant);
+  font-size: 9px;
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+  text-align: center;
+}
+
