@@ -1,16 +1,16 @@
 # Graph Report - insta-paste-tauri  (2026-07-04)
 
 ## Corpus Check
-- 17 files · ~21,031 words
+- 17 files · ~21,440 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 306 nodes · 433 edges · 26 communities (18 shown, 8 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 16 edges (avg confidence: 0.71)
+- 314 nodes · 433 edges · 30 communities (17 shown, 13 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 5 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0143d173`
+- Built from commit: `062c3a3b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -38,47 +38,45 @@
 - [[_COMMUNITY_Self|Self]]
 - [[_COMMUNITY_Option|Option]]
 - [[_COMMUNITY_Vec|Vec]]
+- [[_COMMUNITY_Mutex|Mutex]]
+- [[_COMMUNITY_Option|Option]]
+- [[_COMMUNITY_String|String]]
+- [[_COMMUNITY_Vec|Vec]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `⚙️ Uygulamadaki Tüm Sistemler ve Çalışma Prensipleri` - 14 edges
-2. `reregister_all_shortcuts()` - 13 edges
-3. `AppState` - 11 edges
-4. `Snippet` - 10 edges
-5. `import_data()` - 10 edges
-6. `Settings` - 9 edges
-7. `process_new_clipboard_text()` - 8 edges
-8. `selectAndPaste()` - 8 edges
-9. `save_settings()` - 8 edges
-10. `save_snippets()` - 8 edges
+2. `AppState` - 13 edges
+3. `reregister_all_shortcuts()` - 12 edges
+4. `import_data()` - 10 edges
+5. `save_settings()` - 8 edges
+6. `save_snippets()` - 8 edges
+7. `run()` - 8 edges
+8. `process_new_clipboard_text()` - 8 edges
+9. `show_window()` - 7 edges
+10. `set_autostart()` - 7 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `loadAndDisplay()` --calls--> `fuzzyFilter()`  [INFERRED]
-  src/main.js → src/features.js
-- `processStaticPlaceholders()` --calls--> `processInlineExpressions()`  [INFERRED]
-  src/main.js → src/features.js
-- `processStaticPlaceholders()` --calls--> `resolveLinkedSnippets()`  [INFERRED]
-  src/main.js → src/features.js
-- `processStaticPlaceholders()` --calls--> `processConditionalTemplates()`  [INFERRED]
-  src/main.js → src/features.js
-- `loadAndDisplay()` --calls--> `sortByContext()`  [INFERRED]
-  src/main.js → src/features.js
+- `AppState` --references--> `Mutex`  [EXTRACTED]
+  src-tauri/src/lib.rs →   _Bridges community 2 → community 6_
+- `update_triggers()` --references--> `Vec`  [EXTRACTED]
+  src-tauri/src/keyboard_hook.rs →   _Bridges community 2 → community 7_
 
 ## Import Cycles
 - None detected.
 
-## Communities (26 total, 8 thin omitted)
+## Communities (30 total, 13 thin omitted)
 
 ### Community 0 - "main.js"
 Cohesion: 0.02
-Nodes (67): addBtn, appSettings, appWindow, autoPasteToggle, bulkActionBar, bulkCancelBtn, bulkDeleteBtn, bulkStackBtn (+59 more)
+Nodes (69): addBtn, appSettings, appWindow, autoPasteToggle, bulkActionBar, bulkCancelBtn, bulkDeleteBtn, bulkStackBtn (+61 more)
 
 ### Community 1 - "features.js"
 Cohesion: 0.08
-Nodes (30): checkAutoPromote(), CONTENT_DETECTORS, CONTEXT_MAP, delay(), detectContentType(), escapeHtmlSimple(), executeChain(), fuzzyFilter() (+22 more)
+Nodes (18): checkAutoPromote(), CONTENT_DETECTORS, CONTEXT_MAP, delay(), detectContentType(), escapeHtmlSimple(), executeChain(), fuzzyScore() (+10 more)
 
 ### Community 2 - "lib.rs"
-Cohesion: 0.17
-Nodes (33): Result, AppState, capture_foreground_window(), capture_target(), clear_all_data(), copy_and_paste(), copy_only(), export_data() (+25 more)
+Cohesion: 0.16
+Nodes (36): AppHandle, ClipboardMonitor, Result, Settings, Snippet, AppState, capture_foreground_window(), capture_target() (+28 more)
 
 ### Community 3 - "⚙️ Uygulamadaki Tüm Sistemler ve Çalışma Prensipleri"
 Cohesion: 0.11
@@ -94,11 +92,11 @@ Nodes (16): Default, PathBuf, default_snippet_type(), get_app_dir(), get_setting
 
 ### Community 6 - "process_new_clipboard_text"
 Cohesion: 0.21
-Nodes (11): AppHandle, Arc, AtomicBool, HWND, Self, clipboard_wnd_proc(), ClipboardMonitor, ClipboardPayload (+3 more)
+Nodes (11): Arc, AtomicBool, HWND, Mutex, Self, clipboard_wnd_proc(), ClipboardMonitor, ClipboardPayload (+3 more)
 
 ### Community 7 - "keyboard_hook.rs"
-Cohesion: 0.20
-Nodes (12): Mutex, Option, HookEvent, make_keyboard_input(), map_vk_to_char(), INPUT, String, send_backspaces() (+4 more)
+Cohesion: 0.24
+Nodes (10): Option, HookEvent, make_keyboard_input(), map_vk_to_char(), INPUT, String, send_backspaces(), send_ctrl_v() (+2 more)
 
 ### Community 8 - "QuickPaste — Geliştirici ve Kurulum Kılavuzu (HowToDo.md)"
 Cohesion: 0.18
@@ -121,32 +119,28 @@ Cohesion: 0.83
 Nodes (4): handleOutsideContextClick(), hideTransformSubmenu(), removeContextMenu(), showContextMenu()
 
 ### Community 14 - "applyTheme"
-Cohesion: 0.33
-Nodes (6): getCustomPlaceholders(), performPaste(), promptPlaceholders(), resolveClipboardPlaceholder(), selectAndPaste(), showToast()
-
-### Community 19 - "applyTheme"
-Cohesion: 0.67
-Nodes (3): applyTheme(), applySettings(), saveCurrentSettings()
+Cohesion: 0.18
+Nodes (12): getCustomPlaceholders(), loadAndDisplay(), performPaste(), processClipboardEntry(), processStaticPlaceholders(), promptPlaceholders(), refreshCategoryFilter(), reloadData() (+4 more)
 
 ## Knowledge Gaps
-- **122 isolated node(s):** `name`, `private`, `version`, `type`, `tauri` (+117 more)
+- **124 isolated node(s):** `$schema`, `productName`, `version`, `identifier`, `frontendDist` (+119 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **13 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ClipboardMonitor` connect `process_new_clipboard_text` to `lib.rs`?**
-  _High betweenness centrality (0.033) - this node is a cross-community bridge._
+- **Why does `process_new_clipboard_text()` connect `process_new_clipboard_text` to `lib.rs`?**
+  _High betweenness centrality (0.008) - this node is a cross-community bridge._
 - **Why does `AppState` connect `lib.rs` to `process_new_clipboard_text`?**
-  _High betweenness centrality (0.033) - this node is a cross-community bridge._
-- **Why does `processClipboardEntry()` connect `features.js` to `main.js`?**
-  _High betweenness centrality (0.017) - this node is a cross-community bridge._
-- **What connects `name`, `private`, `version` to the rest of the system?**
-  _122 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.004) - this node is a cross-community bridge._
+- **What connects `$schema`, `productName`, `version` to the rest of the system?**
+  _124 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `main.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.024390243902439025 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.023255813953488372 - nodes in this community are weakly interconnected._
 - **Should `features.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.07657657657657657 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08064516129032258 - nodes in this community are weakly interconnected._
 - **Should `⚙️ Uygulamadaki Tüm Sistemler ve Çalışma Prensipleri` be split into smaller, more focused modules?**
   _Cohesion score 0.10526315789473684 - nodes in this community are weakly interconnected._
+- **Should `tauri.conf.json` be split into smaller, more focused modules?**
+  _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._

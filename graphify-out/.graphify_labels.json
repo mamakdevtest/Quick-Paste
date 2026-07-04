@@ -24,5 +24,9 @@
   "22": "Self",
   "23": "Option",
   "24": "Vec",
-  "25": "tailwind.config.js"
+  "25": "tailwind.config.js",
+  "26": "Mutex",
+  "27": "Option",
+  "28": "String",
+  "29": "Vec"
 }

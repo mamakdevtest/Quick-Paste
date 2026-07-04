@@ -57,43 +57,68 @@
       background: transparent !important;
     }
     body.launcher-mode #mainContainer {
-      background: rgba(18, 18, 24, 0.65) !important;
-      backdrop-filter: blur(24px) !important;
-      -webkit-backdrop-filter: blur(24px) !important;
+      width: 100vw;
+      height: 100vh;
+      background: transparent !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       border-radius: 0;
       border: none;
+      box-shadow: none;
+      filter: drop-shadow(0 25px 50px rgba(0, 0, 0, 0.5));
+    }
+    body.launcher-mode #headerFrame {
+      width: 680px;
+      flex-shrink: 0;
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+      border-left: 1px solid transparent;
+      border-right: 1px solid transparent;
+      border-top: 1px solid transparent;
+      border-bottom: 1px solid transparent;
     }
     body.launcher-mode #bodyArea {
-      flex: none;
+      flex: 1;
       width: 680px;
-      height: 520px;
-      border-radius: 16px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-left: 1px solid transparent;
+      border-right: 1px solid transparent;
       overflow: hidden;
+      box-shadow: none;
+      border-radius: 0;
     }
-    body.launcher-mode.dark #bodyArea {
-      background: #1a1b23;
-      border-color: #2f313d;
+    body.launcher-mode #footerFrame {
+      width: 680px;
+      flex-shrink: 0;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+      border-left: 1px solid transparent;
+      border-right: 1px solid transparent;
+      border-bottom: 1px solid transparent;
+      border-top: 1px solid transparent;
     }
-    body.launcher-mode.light #bodyArea {
-      background: #f2ecf4;
-      border-color: #cbc4d2;
+    body.launcher-mode.dark #headerFrame,
+    body.launcher-mode.dark #bodyArea,
+    body.launcher-mode.dark #footerFrame {
+      background: rgba(26, 27, 35, 0.85) !important;
+      border-color: rgba(47, 49, 61, 0.85) !important;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
-    body.launcher-mode #panelTrack {
-      width: 100% !important;
-      transform: none !important;
+    body.launcher-mode.light #headerFrame,
+    body.launcher-mode.light #bodyArea,
+    body.launcher-mode.light #footerFrame {
+      background: rgba(242, 236, 244, 0.85) !important;
+      border-color: rgba(203, 196, 210, 0.85) !important;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
-    body.launcher-mode #listPanel {
-      width: 100% !important;
-    }
-    body.launcher-mode #dashboardBtn,
     body.launcher-mode #settingsBtn,
-    body.launcher-mode #pinWindowBtn,
-    body.launcher-mode #openLauncherBtn {
+    body.launcher-mode #openLauncherBtn,
+    body.launcher-mode #addBtn {
       display: none !important;
     }
     body.launcher-mode #openSettingsBtn {

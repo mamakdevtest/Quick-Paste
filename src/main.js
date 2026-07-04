@@ -129,6 +129,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       await reloadData();
       setTimeout(() => searchInput.focus(), 80);
     });
+
+    // Capture background window when mouse enters launcher area, 
+    // before click steals focus
+    document.addEventListener('mouseenter', async () => {
+      await invoke('capture_foreground_window');
+    });
   }
 
   appSettings = await invoke('load_settings');
@@ -720,7 +726,7 @@ let firstFocus = true;
 
 window.addEventListener('blur', async () => {
   if (appWindow.label === 'launcher') {
-    await appWindow.hide();
+    // DO NOT hide on blur, allow clicking background windows
     return;
   }
 
@@ -1587,9 +1593,10 @@ placeholderPasteBtn.addEventListener('click', () => {
 });
 
 async function performPaste(content) {
-  const autoPaste = appSettings.auto_paste;
+  const isLauncher = appWindow.label === 'launcher';
+  const autoPaste = isLauncher ? true : appSettings.auto_paste;
   if (autoPaste) {
-    if (pinnedWindow) {
+    if (pinnedWindow && !isLauncher) {
       await invoke('copy_and_paste', { content, hwnd: null, skipCopy: false });
       setTimeout(() => appWindow.setFocus(), 180);
     } else {
@@ -1718,16 +1725,20 @@ dashboardBtn.addEventListener('click', () => {
     panelTrack.classList.add('dashboard-open');
     dashboardBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">arrow_back</span>';
     
-    // Expand window for dashboard panel
-    appWindow.setSize({ type: 'Logical', width: WIN_PANEL_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
+    // Expand window for dashboard panel (only in main mode)
+    if (appWindow.label === 'main') {
+      appWindow.setSize({ type: 'Logical', width: WIN_PANEL_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
+    }
     
     updateDashboardStats();
   } else {
     panelTrack.classList.remove('dashboard-open');
     dashboardBtn.innerHTML = `<div class="flex gap-0.5 h-3.5"><div class="w-1 bg-pink-500 rounded-sm"></div><div class="w-1 bg-green-400 rounded-sm"></div><div class="w-1 bg-blue-400 rounded-sm"></div></div>`;
     
-    // Restore window to base size
-    appWindow.setSize({ type: 'Logical', width: WIN_BASE_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
+    // Restore window to base size (only in main mode)
+    if (appWindow.label === 'main') {
+      appWindow.setSize({ type: 'Logical', width: WIN_BASE_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
+    }
     setTimeout(() => searchInput.focus(), 280);
   }
 });
@@ -1744,14 +1755,18 @@ settingsBtn.addEventListener('click', () => {
     panelTrack.classList.add('settings-open');
     settingsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">arrow_back</span>';
     
-    // Expand window for settings panel
-    appWindow.setSize({ type: 'Logical', width: WIN_PANEL_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
+    // Expand window for settings panel (only in main mode)
+    if (appWindow.label === 'main') {
+      appWindow.setSize({ type: 'Logical', width: WIN_PANEL_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
+    }
   } else {
     panelTrack.classList.remove('settings-open');
     settingsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">settings</span>';
     
-    // Restore window to base size
-    appWindow.setSize({ type: 'Logical', width: WIN_BASE_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
+    // Restore window to base size (only in main mode)
+    if (appWindow.label === 'main') {
+      appWindow.setSize({ type: 'Logical', width: WIN_BASE_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
+    }
     setTimeout(() => searchInput.focus(), 280);
   }
 });

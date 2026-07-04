@@ -31,11 +31,32 @@ struct AppState {
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────────
 
+#[cfg(target_os = "windows")]
+fn is_own_window(hwnd: isize) -> bool {
+    if hwnd == 0 {
+        return false;
+    }
+    unsafe {
+        let mut pid: u32 = 0;
+        windows_sys::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(
+            hwnd as windows_sys::Win32::Foundation::HWND,
+            &mut pid,
+        );
+        let own_pid = windows_sys::Win32::System::Threading::GetCurrentProcessId();
+        pid == own_pid
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_own_window(_hwnd: isize) -> bool {
+    false
+}
+
 /// Capture the currently-active foreground window but reject our own handle or system shell windows.
 fn capture_target(state: &AppState) {
     let hwnd = clipboard_manager::get_foreground_window();
     let own = *state.own_hwnd.lock().unwrap();
-    if hwnd != 0 && hwnd != own && !clipboard_manager::is_system_window(hwnd) {
+    if hwnd != 0 && hwnd != own && !is_own_window(hwnd) && !clipboard_manager::is_system_window(hwnd) {
         let mut prev = state.previous_window.lock().unwrap();
         *prev = hwnd;
     }
