@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Duration;
@@ -14,8 +14,8 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 // Global list of active triggers: (trigger_phrase, snippet_content)
 static ACTIVE_TRIGGERS: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
 
-// Flag to temporarily disable hook processing during backspacing/pasting
-static SUSPEND_HOOK: AtomicBool = AtomicBool::new(false);
+// Suspend counter to allow nested suspends during injection
+static SUSPEND_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 enum HookEvent {
     KeyDown { vk: u32, shift: bool },
@@ -64,7 +64,7 @@ pub fn start_keyboard_hook() {
                         }
                         
                         if let Some(trigger) = matched_trigger {
-                            SUSPEND_HOOK.store(true, Ordering::SeqCst);
+                                                    SUSPEND_COUNT.fetch_add(1, Ordering::SeqCst);
                             typed_buffer.clear();
                             
                             let trigger_len = trigger.len();
@@ -95,7 +95,7 @@ pub fn start_keyboard_hook() {
                                     }
                                     
                                     // 3. Resume hook
-                                    SUSPEND_HOOK.store(false, Ordering::SeqCst);
+                                                            SUSPEND_COUNT.fetch_sub(1, Ordering::SeqCst);
                                 }
                             });
                         }
@@ -144,7 +144,7 @@ pub fn start_keyboard_hook() {
 }
 
 unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: usize, lparam: isize) -> isize {
-    if code >= 0 && !SUSPEND_HOOK.load(Ordering::SeqCst)
+    if code >= 0 && SUSPEND_COUNT.load(Ordering::SeqCst) == 0
         && (wparam == WM_KEYDOWN as usize || wparam == WM_SYSKEYDOWN as usize) {
         let info = *(lparam as *const KBDLLHOOKSTRUCT);
         let vk = info.vkCode;

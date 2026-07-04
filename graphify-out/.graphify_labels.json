@@ -18,15 +18,10 @@
   "16": "formatCharCount",
   "17": "build.rs",
   "18": "main.rs",
-  "19": "applyTheme",
-  "20": "AppHandle",
-  "21": "Mutex",
-  "22": "Self",
-  "23": "Option",
-  "24": "Vec",
-  "25": "tailwind.config.js",
-  "26": "Mutex",
-  "27": "Option",
-  "28": "String",
-  "29": "Vec"
+  "19": "Tauri + Vanilla",
+  "20": "Mutex",
+  "21": "Option",
+  "22": "String",
+  "23": "Vec",
+  "25": "tailwind.config.js"
 }

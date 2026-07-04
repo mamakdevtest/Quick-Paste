@@ -105,9 +105,9 @@ pub fn get_active_process_name() -> String {
 }
 
 #[cfg(target_os = "windows")]
-pub fn restore_focus_and_paste(hwnd_val: isize) {
+pub fn restore_focus_and_paste(hwnd_val: isize) -> bool {
     if hwnd_val == 0 {
-        return;
+        return false;
     }
     let hwnd = hwnd_val as windows_sys::Win32::Foundation::HWND;
     unsafe {
@@ -119,8 +119,13 @@ pub fn restore_focus_and_paste(hwnd_val: isize) {
         let current_thread = GetCurrentThreadId();
         let target_thread = GetWindowThreadProcessId(hwnd, std::ptr::null_mut());
 
+        let mut attached = false;
         if current_thread != target_thread {
-            AttachThreadInput(current_thread, target_thread, 1);
+            if AttachThreadInput(current_thread, target_thread, 1) == 0 {
+                eprintln!("[QuickPaste] restore_focus_and_paste: AttachThreadInput failed");
+            } else {
+                attached = true;
+            }
         }
 
         // Restore window if minimized
@@ -129,25 +134,39 @@ pub fn restore_focus_and_paste(hwnd_val: isize) {
             thread::sleep(Duration::from_millis(50));
         }
 
-        // Set foreground and bring to top
-        SetForegroundWindow(hwnd);
-        BringWindowToTop(hwnd);
+        // Try to bring to foreground with retries
+        let mut success_fg = false;
+        for _ in 0..3 {
+            SetForegroundWindow(hwnd);
+            BringWindowToTop(hwnd);
+            thread::sleep(Duration::from_millis(100));
+            if GetForegroundWindow() == hwnd {
+                success_fg = true;
+                break;
+            }
+        }
+
+        if !success_fg {
+            eprintln!("[QuickPaste] restore_focus_and_paste: couldn't bring hwnd to foreground");
+        }
 
         // Step 3: Wait for focus to settle while attached
         thread::sleep(Duration::from_millis(150));
 
         // Step 4: Inject Ctrl+V
-        send_ctrl_v();
+        let paste_ok = send_ctrl_v();
 
         // Step 5: Clean up and detach thread input
-        if current_thread != target_thread {
+        if attached {
             AttachThreadInput(current_thread, target_thread, 0);
         }
+
+        paste_ok
     }
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn restore_focus_and_paste(window_id_val: isize) {
+pub fn restore_focus_and_paste(window_id_val: isize) -> bool {
     use std::process::Command;
     let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok() || 
                      std::env::var("XDG_SESSION_TYPE").map(|v| v.to_lowercase()).unwrap_or_default() == "wayland";
@@ -156,13 +175,17 @@ pub fn restore_focus_and_paste(window_id_val: isize) {
         // Under Wayland, we sleep briefly to let the focus return to the target window
         thread::sleep(Duration::from_millis(150));
         // Use wtype to simulate Ctrl+V
-        if Command::new("wtype").args(&["-M", "ctrl", "v", "-m", "ctrl"]).status().is_err() {
-            // Try ydotool as fallback (29 is Ctrl, 47 is V)
-            let _ = Command::new("ydotool").args(&["key", "29:1", "47:1", "47:0", "29:0"]).status();
+        if let Ok(status) = Command::new("wtype").args(&["-M", "ctrl", "v", "-m", "ctrl"]).status() {
+            if status.success() { return true; }
         }
+        // Try ydotool as fallback (29 is Ctrl, 47 is V)
+        if let Ok(status) = Command::new("ydotool").args(&["key", "29:1", "47:1", "47:0", "29:0"]).status() {
+            return status.success();
+        }
+        return false;
     } else {
         if window_id_val == 0 {
-            return;
+            return false;
         }
         let _ = Command::new("xdotool")
             .args(&["keyup", "alt", "ctrl", "shift"])
@@ -170,14 +193,17 @@ pub fn restore_focus_and_paste(window_id_val: isize) {
         thread::sleep(Duration::from_millis(50));
 
         let window_str = window_id_val.to_string();
-        let _ = Command::new("xdotool")
+        if let Ok(status) = Command::new("xdotool")
             .args(&["windowactivate", "--sync", &window_str])
-            .status();
-        thread::sleep(Duration::from_millis(120));
-
-        let _ = Command::new("xdotool")
-            .args(&["key", "ctrl+v"])
-            .status();
+            .status() {
+            thread::sleep(Duration::from_millis(120));
+            if let Ok(status2) = Command::new("xdotool")
+                .args(&["key", "ctrl+v"]) 
+                .status() {
+                return status2.success();
+            }
+        }
+        false
     }
 }
 
@@ -213,13 +239,15 @@ unsafe fn release_all_modifiers() {
 }
 
 #[cfg(target_os = "windows")]
-unsafe fn send_ctrl_v() {
+unsafe fn send_ctrl_v() -> bool {
     let ctrl_down = make_keyboard_input(0x11, 0); // VK_CONTROL
     let v_down = make_keyboard_input(0x56, 0);    // V key
     let inputs_down = [ctrl_down, v_down];
     let injected_down = SendInput(2, inputs_down.as_ptr(), std::mem::size_of::<INPUT>() as i32);
+    let mut ok = true;
     if injected_down == 0 {
         eprintln!("[QuickPaste] clipboard_manager::send_ctrl_v: SendInput failed (down)");
+        ok = false;
     }
 
     thread::sleep(Duration::from_millis(15));
@@ -230,7 +258,9 @@ unsafe fn send_ctrl_v() {
     let injected_up = SendInput(2, inputs_up.as_ptr(), std::mem::size_of::<INPUT>() as i32);
     if injected_up == 0 {
         eprintln!("[QuickPaste] clipboard_manager::send_ctrl_v: SendInput failed (up)");
+        ok = false;
     }
+    ok
 }
 
 #[cfg(target_os = "windows")]

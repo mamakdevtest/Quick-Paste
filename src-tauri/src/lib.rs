@@ -79,9 +79,12 @@ fn reregister_all_shortcuts(app: &AppHandle) -> Result<(), String> {
         let _ = global_shortcut.register(alt_w);
     }
 
-    // Register Alt+Q hotkey
+    // Register Alt+Q and Ctrl+Q hotkeys
     if let Ok(alt_q) = Shortcut::from_str("Alt+Q") {
         let _ = global_shortcut.register(alt_q);
+    }
+    if let Ok(ctrl_q) = Shortcut::from_str("Ctrl+Q") {
+        let _ = global_shortcut.register(ctrl_q);
     }
 
     // Register all snippet custom shortcuts
@@ -160,20 +163,22 @@ fn capture_foreground_window(state: State<'_, AppState>) -> isize {
 }
 
 #[tauri::command]
-fn copy_and_paste(state: State<'_, AppState>, content: String, hwnd: Option<isize>, skip_copy: bool) {
+fn copy_and_paste(state: State<'_, AppState>, content: String, hwnd: Option<isize>, skip_copy: bool) -> bool {
     let content_len = content.len();
+
+    let mut success = false;
+    let mut last_attempt = 0;
+    let mut wait_ms = 10u64;
 
     if !skip_copy {
         // Retry writing to clipboard multiple times with exponential backoff
-        let mut success = false;
-        let mut last_attempt = 0;
-        let mut wait_ms = 10u64;
         for attempt in 1..=6 {
             last_attempt = attempt;
             match arboard::Clipboard::new() {
                 Ok(mut ctx) => match ctx.set_text(content.clone()) {
                     Ok(_) => {
                         success = true;
+                        println!("[QuickPaste] Clipboard write succeeded ({} bytes) on attempt {}", content_len, attempt);
                         break;
                     }
                     Err(e) => {
@@ -191,8 +196,7 @@ fn copy_and_paste(state: State<'_, AppState>, content: String, hwnd: Option<isiz
 
         if !success {
             eprintln!("[QuickPaste] Error: Failed to write {} bytes to clipboard after {} attempts", content_len, last_attempt);
-        } else {
-            println!("[QuickPaste] Clipboard write succeeded ({} bytes) after {} attempts", content_len, last_attempt);
+            return false;
         }
     } else {
         println!("[QuickPaste] Skipping clipboard write as requested (content_len={})", content_len);
@@ -202,13 +206,15 @@ fn copy_and_paste(state: State<'_, AppState>, content: String, hwnd: Option<isiz
     if target != 0 {
         // Sleep slightly to let the clipboard register before activating focus and pasting
         thread::sleep(Duration::from_millis(60));
-        eprintln!("[QuickPaste] Pasting to target hwnd={} (content_len={})", target, content_len);
-        clipboard_manager::restore_focus_and_paste(target);
+        println!("[QuickPaste] Pasting to target hwnd={} (content_len={})", target, content_len);
+        let _ = clipboard_manager::restore_focus_and_paste(target);
     }
+
+    true
 }
 
 #[tauri::command]
-fn copy_only(content: String) {
+fn copy_only(content: String) -> bool {
     let content_len = content.len();
     let mut success = false;
     let mut wait_ms = 10u64;
@@ -233,7 +239,10 @@ fn copy_only(content: String) {
     }
     if !success {
         eprintln!("[QuickPaste] copy_only: failed to write {} bytes after attempts", content_len);
+    } else {
+        println!("[QuickPaste] copy_only: succeeded ({} bytes)", content_len);
     }
+    success
 }
 
 #[tauri::command]
@@ -465,6 +474,21 @@ pub fn run() {
                                 return;
                             }
                         }
+                        // Check Ctrl+Q as alternative launcher shortcut
+                        if let Ok(ctrl_q_shortcut) = Shortcut::from_str("Ctrl+Q") {
+                            if shortcut == &ctrl_q_shortcut {
+                                if let Some(win) = app.get_webview_window("launcher") {
+                                    let is_visible = win.is_visible().unwrap_or(false);
+                                    if is_visible {
+                                        let _ = win.hide();
+                                    } else {
+                                        show_window(&win, &state);
+                                        let _ = win.emit("focus-search", ());
+                                    }
+                                }
+                                return;
+                            }
+                        }
 
                         // Check if one of the snippet custom hotkeys is pressed
                         let snippets = data_store::load_snippets();
@@ -475,7 +499,10 @@ pub fn run() {
                                     if let Ok(snippet_shortcut) = Shortcut::from_str(&formatted) {
                                         if shortcut == &snippet_shortcut {
                                             let state = app.state::<AppState>();
-                                            copy_and_paste(state, snippet.content.clone(), None, false);
+                                            let ok = copy_and_paste(state, snippet.content.clone(), None, false);
+                                            if !ok {
+                                                eprintln!("[QuickPaste] GlobalShortcut: paste failed for snippet hotkey");
+                                            }
                                             return;
                                         }
                                     }
@@ -491,7 +518,10 @@ pub fn run() {
                                     if let Ok(slot_shortcut) = Shortcut::from_str(&formatted) {
                                         if shortcut == &slot_shortcut {
                                             let state = app.state::<AppState>();
-                                            copy_and_paste(state, snippet.content.clone(), None, false);
+                                            let ok = copy_and_paste(state, snippet.content.clone(), None, false);
+                                            if !ok {
+                                                eprintln!("[QuickPaste] GlobalShortcut: paste failed for favorite slot hotkey");
+                                            }
                                             return;
                                         }
                                     }

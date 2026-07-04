@@ -350,8 +350,17 @@ export async function executeChain(chain, snippets, invoke) {
         s.title.toLowerCase() === step.toLowerCase()
       );
       if (found) {
-        await invoke('copy_and_paste', { content: found.content, hwnd: null, skipCopy: false });
-        await delay(120);
+        try {
+          const ok = await invoke('copy_and_paste', { content: found.content, hwnd: null, skipCopy: false });
+          if (!ok) {
+            console.error('copy_and_paste failed during executeChain');
+            break;
+          }
+          await delay(120);
+        } catch (err) {
+          console.error('copy_and_paste threw in executeChain', err);
+          break;
+        }
       }
     }
   }

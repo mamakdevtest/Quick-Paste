@@ -527,8 +527,19 @@ function loadAndDisplay() {
     // Copy-only button
     card.querySelector('.card-copy-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
-      await invoke('copy_only', { content: s.content });
-      showToast('Copied!', 1200, 'success');
+      try {
+        const ok = await invoke('copy_only', { content: s.content });
+        if (ok) {
+          showToast('Copied!', 1200, 'success');
+          if (appWindow.label === 'launcher' && !pinnedWindow) {
+            await appWindow.hide();
+          }
+        } else {
+          showToast('Copy failed', 1600, 'error');
+        }
+      } catch (err) {
+        showToast('Copy failed', 1600, 'error');
+      }
     });
 
     // Quick Look button on card
@@ -971,12 +982,25 @@ window.addEventListener('keydown', async e => {
       const text = await navigator.clipboard.readText();
       if (text) {
         if (pinnedWindow) {
-          await invoke('copy_and_paste', { content: text, hwnd: null, skipCopy: false });
-          setTimeout(() => appWindow.setFocus(), 180);
+          try {
+            const ok = await invoke('copy_and_paste', { content: text, hwnd: null, skipCopy: false });
+            if (ok) {
+              setTimeout(() => appWindow.setFocus(), 180);
+            } else {
+              showToast('Paste failed', 1600, 'error');
+            }
+          } catch (err) {
+            showToast('Paste failed', 1600, 'error');
+          }
         } else {
           await appWindow.hide();
           setTimeout(async () => {
-            await invoke('copy_and_paste', { content: text, hwnd: null, skipCopy: false });
+            try {
+              const ok = await invoke('copy_and_paste', { content: text, hwnd: null, skipCopy: false });
+              if (!ok) showToast('Paste failed', 1600, 'error');
+            } catch (err) {
+              showToast('Paste failed', 1600, 'error');
+            }
           }, 120);
         }
       }
@@ -991,8 +1015,19 @@ window.addEventListener('keydown', async e => {
     if (selectedIndex >= 0 && selectedIndex < filteredSnippets.length) {
       e.preventDefault();
       const s = filteredSnippets[selectedIndex].s;
-      await invoke('copy_only', { content: s.content });
-      showToast('Copied to clipboard!', 1200, 'success');
+      try {
+        const ok = await invoke('copy_only', { content: s.content });
+        if (ok) {
+          showToast('Copied to clipboard!', 1200, 'success');
+          if (appWindow.label === 'launcher' && !pinnedWindow) {
+            await appWindow.hide();
+          }
+        } else {
+          showToast('Copy failed', 1600, 'error');
+        }
+      } catch (err) {
+        showToast('Copy failed', 1600, 'error');
+      }
       return;
     }
   }
@@ -1597,19 +1632,40 @@ async function performPaste(content) {
   const autoPaste = isLauncher ? true : appSettings.auto_paste;
   if (autoPaste) {
     if (pinnedWindow && !isLauncher) {
-      await invoke('copy_and_paste', { content, hwnd: null, skipCopy: false });
-      setTimeout(() => appWindow.setFocus(), 180);
+      try {
+        const ok = await invoke('copy_and_paste', { content, hwnd: null, skipCopy: false });
+        if (ok) {
+          setTimeout(() => appWindow.setFocus(), 180);
+        } else {
+          showToast('Paste failed', 1600, 'error');
+        }
+      } catch (err) {
+        showToast('Paste failed', 1600, 'error');
+      }
     } else {
       await appWindow.hide();
       setTimeout(async () => {
-        await invoke('copy_and_paste', { content, hwnd: null, skipCopy: false });
+        try {
+          const ok = await invoke('copy_and_paste', { content, hwnd: null, skipCopy: false });
+          if (!ok) showToast('Paste failed', 1600, 'error');
+        } catch (err) {
+          showToast('Paste failed', 1600, 'error');
+        }
       }, 120);
     }
   } else {
-    await invoke('copy_only', { content });
-    showToast('Copied to clipboard!', 1600, 'success');
-    if (!pinnedWindow) {
-      await appWindow.hide();
+    try {
+      const ok = await invoke('copy_only', { content });
+      if (ok) {
+        showToast('Copied to clipboard!', 1600, 'success');
+        if (!pinnedWindow) {
+          await appWindow.hide();
+        }
+      } else {
+        showToast('Copy failed', 1600, 'error');
+      }
+    } catch (err) {
+      showToast('Copy failed', 1600, 'error');
     }
   }
 }
