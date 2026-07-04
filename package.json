@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "css:build": "src\\assets\\tailwindcss.exe -c tailwind.config.js -i src/assets/tailwind.input.css -o src/assets/tailwind.css --minify",
+    "css:watch": "src\\assets\\tailwindcss.exe -c tailwind.config.js -i src/assets/tailwind.input.css -o src/assets/tailwind.css --watch"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.5"

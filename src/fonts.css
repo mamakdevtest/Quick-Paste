@@ -1,0 +1,68 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   QuickPaste — Local Fonts (Offline)
+   All fonts are bundled inside src/assets/
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Inter — 400 Regular */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./assets/inter-regular.woff2') format('woff2'),
+       url('./assets/inter-regular.woff2') format('woff2');
+}
+
+/* Inter — 500 Medium */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url('./assets/inter-medium.woff2') format('woff2');
+}
+
+/* Inter — 600 SemiBold */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url('./assets/inter-semibold.woff2') format('woff2');
+}
+
+/* Inter — 700 Bold */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('./assets/inter-bold.ttf') format('truetype');
+}
+
+/* JetBrains Mono — 400 Regular */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./assets/jetbrains-mono-regular.ttf') format('truetype');
+}
+
+/* JetBrains Mono — 500 Medium */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url('./assets/jetbrains-mono-medium.ttf') format('truetype');
+}
+
+/* Material Symbols Outlined — Variable font */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('./assets/material-symbols.ttf') format('truetype');
+}

@@ -1,0 +1,21 @@
+{
+  "0": "main.js",
+  "1": "features.js",
+  "2": "lib.rs",
+  "3": "⚙️ Uygulamadaki Tüm Sistemler ve Çalışma Prensipleri",
+  "4": "tauri.conf.json",
+  "5": "data_store.rs",
+  "6": "process_new_clipboard_text",
+  "7": "keyboard_hook.rs",
+  "8": "QuickPaste — Geliştirici ve Kurulum Kılavuzu (HowToDo.md)",
+  "9": "clipboard_manager.rs",
+  "10": "package.json",
+  "11": "default.json",
+  "12": "handleOutsideContextClick",
+  "13": "Tauri + Vanilla",
+  "14": "applyTheme",
+  "15": "escapeHtml",
+  "16": "formatCharCount",
+  "17": "build.rs",
+  "18": "main.rs"
+}

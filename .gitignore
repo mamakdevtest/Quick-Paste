@@ -1,5 +1,12 @@
 # ─── Node / npm ───────────────────────────────────────────────────────────────
 node_modules/
+
+# ─── Tailwind CLI binary (large, download per-platform) ──────────────────────
+src/assets/tailwindcss.exe
+# Tailwind temp files
+src/assets/tailwind.input.css
+src/assets/*.txt
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

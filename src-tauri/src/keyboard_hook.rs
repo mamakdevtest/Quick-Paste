@@ -1,22 +1,27 @@
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Duration;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     SetWindowsHookExW, UnhookWindowsHookEx, CallNextHookEx, WH_KEYBOARD_LL, KBDLLHOOKSTRUCT, WM_KEYDOWN, WM_SYSKEYDOWN
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyState, SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT
+    GetKeyState, SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT,
+    GetKeyboardState, ToUnicode, MapVirtualKeyW, MAPVK_VK_TO_VSC
 };
 
 // Global list of active triggers: (trigger_phrase, snippet_content)
 static ACTIVE_TRIGGERS: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
 
-// Buffer to store recently typed characters
-static TYPED_BUFFER: Mutex<String> = Mutex::new(String::new());
-
 // Flag to temporarily disable hook processing during backspacing/pasting
 static SUSPEND_HOOK: AtomicBool = AtomicBool::new(false);
+
+enum HookEvent {
+    KeyDown { vk: u32, shift: bool },
+}
+
+static EVENT_SENDER: Mutex<Option<Sender<HookEvent>>> = Mutex::new(None);
 
 pub fn update_triggers(list: Vec<(String, String)>) {
     if let Ok(mut active) = ACTIVE_TRIGGERS.lock() {
@@ -25,6 +30,93 @@ pub fn update_triggers(list: Vec<(String, String)>) {
 }
 
 pub fn start_keyboard_hook() {
+    let (tx, rx) = channel::<HookEvent>();
+    if let Ok(mut sender_guard) = EVENT_SENDER.lock() {
+        *sender_guard = Some(tx);
+    }
+
+    // Spawn the worker thread that processes hook events asynchronously
+    thread::spawn(move || {
+        let mut typed_buffer = String::new();
+        while let Ok(event) = rx.recv() {
+            match event {
+                HookEvent::KeyDown { vk, shift } => {
+                    let c = map_vk_to_char(vk, shift);
+                    if let Some(ch) = c {
+                        typed_buffer.push(ch);
+                        
+                        // Limit buffer length
+                        if typed_buffer.len() > 30 {
+                            typed_buffer.remove(0);
+                        }
+                        
+                        let mut matched_trigger = None;
+                        let mut matched_content = String::new();
+                        
+                        if let Ok(triggers) = ACTIVE_TRIGGERS.lock() {
+                            for (trigger, content) in triggers.iter() {
+                                if typed_buffer.ends_with(trigger) {
+                                    matched_trigger = Some(trigger.clone());
+                                    matched_content = content.clone();
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if let Some(trigger) = matched_trigger {
+                            SUSPEND_HOOK.store(true, Ordering::SeqCst);
+                            typed_buffer.clear();
+                            
+                            let trigger_len = trigger.len();
+                            let matched_content_clone = matched_content;
+                            
+                            thread::spawn(move || {
+                                thread::sleep(Duration::from_millis(15));
+                                unsafe {
+                                    // 1. Send backspaces to delete trigger phrase
+                                    send_backspaces(trigger_len);
+                                    thread::sleep(Duration::from_millis(50));
+                                    
+                                    // 2. Write to clipboard and paste
+                                    let mut success = false;
+                                    for _ in 0..5 {
+                                        if let Ok(mut ctx) = arboard::Clipboard::new() {
+                                            if ctx.set_text(matched_content_clone.clone()).is_ok() {
+                                                success = true;
+                                                break;
+                                            }
+                                        }
+                                        thread::sleep(Duration::from_millis(15));
+                                    }
+                                    
+                                    if success {
+                                        thread::sleep(Duration::from_millis(50));
+                                        send_ctrl_v();
+                                    }
+                                    
+                                    // 3. Resume hook
+                                    SUSPEND_HOOK.store(false, Ordering::SeqCst);
+                                }
+                            });
+                        }
+                    } else {
+                        // Buffer clearing logic on separator/control keys
+                        if vk == 0x08 { // VK_BACK (Backspace)
+                            typed_buffer.pop();
+                        } else if vk == 0x0D || vk == 0x1B || vk == 0x09 { // Enter, Escape, Tab
+                            typed_buffer.clear();
+                        } else if vk >= 0x10 && vk <= 0x12 { // Shift, Ctrl, Alt
+                            // ignore modifier keys alone
+                        } else {
+                            typed_buffer.clear();
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Spawn the low-level hook Win32 message loop thread
     thread::spawn(|| {
         unsafe {
             let hook = SetWindowsHookExW(
@@ -40,7 +132,6 @@ pub fn start_keyboard_hook() {
             
             println!("[QuickPaste] Low-level keyboard hook installed");
             
-            // Win32 message loop
             use windows_sys::Win32::UI::WindowsAndMessaging::{GetMessageW, MSG};
             let mut msg: MSG = std::mem::zeroed();
             while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
@@ -57,86 +148,11 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: usize, lparam: i
         if wparam == WM_KEYDOWN as usize || wparam == WM_SYSKEYDOWN as usize {
             let info = *(lparam as *const KBDLLHOOKSTRUCT);
             let vk = info.vkCode;
-            
-            // Check shift state (VK_SHIFT = 0x10)
             let shift = GetKeyState(0x10) < 0;
             
-            let c = map_vk_to_char(vk, shift);
-            if let Some(ch) = c {
-                let mut buf = TYPED_BUFFER.lock().unwrap();
-                buf.push(ch);
-                
-                // Limit buffer length to prevent infinite growth
-                if buf.len() > 30 {
-                    buf.remove(0);
-                }
-                
-                // Check if buffer ends with any trigger phrase
-                let mut matched_trigger = None;
-                let mut matched_content = String::new();
-                
-                if let Ok(triggers) = ACTIVE_TRIGGERS.lock() {
-                    for (trigger, content) in triggers.iter() {
-                        if buf.ends_with(trigger) {
-                            matched_trigger = Some(trigger.clone());
-                            matched_content = content.clone();
-                            break;
-                        }
-                    }
-                }
-                
-                if let Some(trigger) = matched_trigger {
-                    // Suspend hook to prevent self-capturing simulated inputs
-                    SUSPEND_HOOK.store(true, Ordering::SeqCst);
-                    
-                    // Clear buffer
-                    buf.clear();
-                    drop(buf); // unlock buffer before thread sleep and paste
-                    
-                    // Execute backspacing and pasting on a separate thread to prevent hook lagging
-                    thread::spawn(move || {
-                        thread::sleep(Duration::from_millis(15));
-                        unsafe {
-                            // 1. Send backspaces to delete trigger phrase
-                            send_backspaces(trigger.len());
-                            thread::sleep(Duration::from_millis(50));
-                            
-                            // 2. Write to clipboard and paste
-                            let mut success = false;
-                            for _ in 0..5 {
-                                if let Ok(mut ctx) = arboard::Clipboard::new() {
-                                    if ctx.set_text(matched_content.clone()).is_ok() {
-                                        success = true;
-                                        break;
-                                    }
-                                }
-                                thread::sleep(Duration::from_millis(15));
-                            }
-                            
-                            if success {
-                                thread::sleep(Duration::from_millis(50));
-                                send_ctrl_v();
-                            }
-                            
-                            // 3. Resume hook
-                            SUSPEND_HOOK.store(false, Ordering::SeqCst);
-                        }
-                    });
-                    
-                    return CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam);
-                }
-            } else {
-                // Buffer clearing logic on separator/control keys
-                if vk == 0x08 { // VK_BACK (Backspace)
-                    let mut buf = TYPED_BUFFER.lock().unwrap();
-                    buf.pop();
-                } else if vk == 0x0D || vk == 0x1B || vk == 0x09 { // Enter, Escape, Tab
-                    TYPED_BUFFER.lock().unwrap().clear();
-                } else if vk >= 0x10 && vk <= 0x12 { // Shift, Ctrl, Alt (modifier keys alone should be ignored)
-                    // ignore
-                } else {
-                    // For other non-character control keys, clear the buffer
-                    TYPED_BUFFER.lock().unwrap().clear();
+            if let Ok(sender_guard) = EVENT_SENDER.lock() {
+                if let Some(ref sender) = *sender_guard {
+                    let _ = sender.send(HookEvent::KeyDown { vk, shift });
                 }
             }
         }
@@ -144,45 +160,38 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: usize, lparam: i
     CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam)
 }
 
-fn map_vk_to_char(vk: u32, shift: bool) -> Option<char> {
-    match vk {
-        // Numbers
-        0x30 => Some(if shift { '=' } else { '0' }),
-        0x31 => Some(if shift { '!' } else { '1' }),
-        0x32 => Some(if shift { '\'' } else { '2' }),
-        0x33 => Some(if shift { '^' } else { '3' }),
-        0x34 => Some(if shift { '+' } else { '4' }),
-        0x35 => Some(if shift { '%' } else { '5' }),
-        0x36 => Some(if shift { '&' } else { '6' }),
-        0x37 => Some(if shift { '/' } else { '7' }),
-        0x38 => Some(if shift { '(' } else { '8' }),
-        0x39 => Some(if shift { ')' } else { '9' }),
-        
-        // Letters (convert to lowercase for triggers)
-        0x41..=0x5A => {
-            let base = if shift { 'A' } else { 'a' };
-            Some(std::char::from_u32((vk - 0x41) + (base as u32)).unwrap())
+fn map_vk_to_char(vk: u32, _shift: bool) -> Option<char> {
+    unsafe {
+        let mut keyboard_state = [0u8; 256];
+        GetKeyboardState(keyboard_state.as_mut_ptr());
+
+        // Low-level hooks run before keyboard state is updated, so manually query Shift/Caps
+        if GetKeyState(0x10) < 0 { // VK_SHIFT
+            keyboard_state[0x10] = 0x80;
         }
+        if GetKeyState(0x14) & 1 != 0 { // VK_CAPITAL (Caps Lock)
+            keyboard_state[0x14] = 0x01;
+        }
+
+        let scan_code = MapVirtualKeyW(vk, MAPVK_VK_TO_VSC);
+        let mut buffer = [0u16; 4];
         
-        // Space
-        0x20 => Some(' '),
-        
-        // Common Punctuation
-        0xBE => Some(if shift { ':' } else { '.' }), // Period / Colon
-        0xBC => Some(if shift { ';' } else { ',' }), // Comma / Semicolon
-        0xBD => Some(if shift { '_' } else { '-' }), // Dash / Underscore
-        0xBF => Some(if shift { '?' } else { '/' }), // Slash / Question Mark
-        0xDC => Some(if shift { '|' } else { '\\' }), // Backslash / Pipe
-        
-        // Turkish Layout Specifics (Turkish Q)
-        0xBA => Some(if shift { 'Ş' } else { 'ş' }), // Ş key
-        0xDB => Some(if shift { 'Ğ' } else { 'ğ' }), // Ğ key
-        0xDD => Some(if shift { 'İ' } else { 'ı' }), // İ/ı key
-        0xDE => Some(if shift { 'Ç' } else { 'ç' }), // Ç key
-        0xC0 => Some(if shift { 'Ü' } else { 'ü' }), // Ü key
-        0xBB => Some(if shift { '*' } else { '+' }), // Plus key
-        
-        _ => None,
+        let result = ToUnicode(
+            vk,
+            scan_code,
+            keyboard_state.as_ptr(),
+            buffer.as_mut_ptr(),
+            buffer.len() as i32,
+            0
+        );
+
+        if result > 0 {
+            std::char::decode_utf16(buffer[..result as usize].iter().copied())
+                .next()
+                .and_then(|r| r.ok())
+        } else {
+            None
+        }
     }
 }
 

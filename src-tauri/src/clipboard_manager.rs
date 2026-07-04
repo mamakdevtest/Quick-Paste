@@ -77,6 +77,12 @@ pub fn get_active_process_name() -> String {
 
 #[cfg(not(target_os = "windows"))]
 pub fn get_foreground_window() -> isize {
+    let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok() || 
+                     std::env::var("XDG_SESSION_TYPE").map(|v| v.to_lowercase()).unwrap_or_default() == "wayland";
+    if is_wayland {
+        return 1; // dummy window handle to bypass target != 0 checks
+    }
+
     // Linux active window capture via xdotool
     use std::process::Command;
     if let Ok(output) = Command::new("xdotool").arg("getactivewindow").output() {
@@ -142,24 +148,37 @@ pub fn restore_focus_and_paste(hwnd_val: isize) {
 
 #[cfg(not(target_os = "windows"))]
 pub fn restore_focus_and_paste(window_id_val: isize) {
-    if window_id_val == 0 {
-        return;
-    }
     use std::process::Command;
-    let _ = Command::new("xdotool")
-        .args(&["keyup", "alt", "ctrl", "shift"])
-        .status();
-    thread::sleep(Duration::from_millis(50));
+    let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok() || 
+                     std::env::var("XDG_SESSION_TYPE").map(|v| v.to_lowercase()).unwrap_or_default() == "wayland";
 
-    let window_str = window_id_val.to_string();
-    let _ = Command::new("xdotool")
-        .args(&["windowactivate", "--sync", &window_str])
-        .status();
-    thread::sleep(Duration::from_millis(120));
+    if is_wayland {
+        // Under Wayland, we sleep briefly to let the focus return to the target window
+        thread::sleep(Duration::from_millis(150));
+        // Use wtype to simulate Ctrl+V
+        if Command::new("wtype").args(&["-M", "ctrl", "v", "-m", "ctrl"]).status().is_err() {
+            // Try ydotool as fallback (29 is Ctrl, 47 is V)
+            let _ = Command::new("ydotool").args(&["key", "29:1", "47:1", "47:0", "29:0"]).status();
+        }
+    } else {
+        if window_id_val == 0 {
+            return;
+        }
+        let _ = Command::new("xdotool")
+            .args(&["keyup", "alt", "ctrl", "shift"])
+            .status();
+        thread::sleep(Duration::from_millis(50));
 
-    let _ = Command::new("xdotool")
-        .args(&["key", "ctrl+v"])
-        .status();
+        let window_str = window_id_val.to_string();
+        let _ = Command::new("xdotool")
+            .args(&["windowactivate", "--sync", &window_str])
+            .status();
+        thread::sleep(Duration::from_millis(120));
+
+        let _ = Command::new("xdotool")
+            .args(&["key", "ctrl+v"])
+            .status();
+    }
 }
 
 #[cfg(target_os = "windows")]

@@ -345,10 +345,9 @@ export async function executeChain(chain, snippets, invoke) {
       const ms = parseInt(step.split(':')[1], 10) || 200;
       await delay(ms);
     } else {
-      // Find snippet by title or id
+      // Find snippet by title
       const found = snippets.find(s =>
-        s.title.toLowerCase() === step.toLowerCase() ||
-        s.id === step
+        s.title.toLowerCase() === step.toLowerCase()
       );
       if (found) {
         await invoke('copy_and_paste', { content: found.content, hwnd: null, skipCopy: false });

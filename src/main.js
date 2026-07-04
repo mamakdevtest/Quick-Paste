@@ -19,6 +19,11 @@ const { listen }  = window.__TAURI__.event;
 const { getCurrentWindow } = window.__TAURI__.window;
 const appWindow = getCurrentWindow();
 
+// ─── Window Size Constants ──────────────────────────────────────────────────────
+const WIN_BASE_WIDTH  = 410;  // default window width
+const WIN_BASE_HEIGHT = 800;  // default window height
+const WIN_PANEL_WIDTH = 480;  // width when a side panel (Settings/Dashboard) is open
+
 // ─── App State ─────────────────────────────────────────────────────────────────
 let snippets         = [];
 let filteredSnippets = [];
@@ -1666,10 +1671,16 @@ dashboardBtn.addEventListener('click', () => {
     panelTrack.classList.add('dashboard-open');
     dashboardBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">arrow_back</span>';
     
+    // Expand window for dashboard panel
+    appWindow.setSize({ type: 'Logical', width: WIN_PANEL_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
+    
     updateDashboardStats();
   } else {
     panelTrack.classList.remove('dashboard-open');
     dashboardBtn.innerHTML = `<div class="flex gap-0.5 h-3.5"><div class="w-1 bg-pink-500 rounded-sm"></div><div class="w-1 bg-green-400 rounded-sm"></div><div class="w-1 bg-blue-400 rounded-sm"></div></div>`;
+    
+    // Restore window to base size
+    appWindow.setSize({ type: 'Logical', width: WIN_BASE_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
     setTimeout(() => searchInput.focus(), 280);
   }
 });
@@ -1685,9 +1696,15 @@ settingsBtn.addEventListener('click', () => {
     
     panelTrack.classList.add('settings-open');
     settingsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">arrow_back</span>';
+    
+    // Expand window for settings panel
+    appWindow.setSize({ type: 'Logical', width: WIN_PANEL_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
   } else {
     panelTrack.classList.remove('settings-open');
     settingsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">settings</span>';
+    
+    // Restore window to base size
+    appWindow.setSize({ type: 'Logical', width: WIN_BASE_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
     setTimeout(() => searchInput.focus(), 280);
   }
 });

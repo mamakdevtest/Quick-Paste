@@ -5,47 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QuickPaste</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Local Fonts (offline-ready, no CDN) -->
+  <link rel="stylesheet" href="fonts.css">
+  <!-- Local Tailwind CSS build -->
+  <link rel="stylesheet" href="assets/tailwind.css">
 
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet"/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 
-  <!-- TailwindCSS -->
-  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          },
-          colors: {
-            /* Dark mode palette */
-            'd-bg':     '#121212',
-            'd-card':   '#1a1b23',
-            'd-hover':  '#252630',
-            'd-input':  '#181920',
-            'd-border': '#2f313d',
-            'd-border2':'#4b4d5a',
-            'd-text':   '#e2e2e4',
-            'd-dim':    '#8b8d98',
-            'd-primary':'#60a5fa',
-            /* Light mode palette — Material You */
-            'l-bg':     '#fdf7ff',
-            'l-surface':'#fdf7ff',
-            'l-card':   '#f2ecf4',
-            'l-hover':  '#e6e0e9',
-            'l-border': '#cbc4d2',
-            'l-text':   '#1d1b20',
-            'l-dim':    '#49454f',
-            'l-primary':'#4f378a',
-          }
-        }
-      }
-    };
-  </script>
 
   <style>
     /* ─── Base ───────────────────────────────────────────────────────────────── */
@@ -54,6 +19,7 @@
 
     /* ─── Material Symbols ──────────────────────────────────────────────────── */
     .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined';
       font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
       display: inline-flex; align-items: center; justify-content: center;
       vertical-align: middle;

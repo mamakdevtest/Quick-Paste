@@ -11,9 +11,9 @@
     "windows": [
       {
         "title": "QuickPaste",
-        "width": 360,
+        "width": 410,
         "height": 800,
-        "minWidth": 320,
+        "minWidth": 370,
         "minHeight": 480,
         "resizable": true,
         "decorations": false,
