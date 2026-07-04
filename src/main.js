@@ -527,8 +527,19 @@ function loadAndDisplay() {
     // Copy-only button
     card.querySelector('.card-copy-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
-      await invoke('copy_only', { content: s.content });
-      showToast('Copied!', 1200, 'success');
+      try {
+        const ok = await invoke('copy_only', { content: s.content });
+        if (ok) {
+          showToast('Copied!', 1200, 'success');
+          if (appWindow.label === 'launcher' && !pinnedWindow) {
+            await appWindow.hide();
+          }
+        } else {
+          showToast('Copy failed', 1600, 'error');
+        }
+      } catch (err) {
+        showToast('Copy failed', 1600, 'error');
+      }
     });
 
     // Quick Look button on card
@@ -991,8 +1002,19 @@ window.addEventListener('keydown', async e => {
     if (selectedIndex >= 0 && selectedIndex < filteredSnippets.length) {
       e.preventDefault();
       const s = filteredSnippets[selectedIndex].s;
-      await invoke('copy_only', { content: s.content });
-      showToast('Copied to clipboard!', 1200, 'success');
+      try {
+        const ok = await invoke('copy_only', { content: s.content });
+        if (ok) {
+          showToast('Copied to clipboard!', 1200, 'success');
+          if (appWindow.label === 'launcher' && !pinnedWindow) {
+            await appWindow.hide();
+          }
+        } else {
+          showToast('Copy failed', 1600, 'error');
+        }
+      } catch (err) {
+        showToast('Copy failed', 1600, 'error');
+      }
       return;
     }
   }

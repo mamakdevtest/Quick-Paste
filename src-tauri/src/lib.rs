@@ -208,7 +208,7 @@ fn copy_and_paste(state: State<'_, AppState>, content: String, hwnd: Option<isiz
 }
 
 #[tauri::command]
-fn copy_only(content: String) {
+fn copy_only(content: String) -> bool {
     let content_len = content.len();
     let mut success = false;
     let mut wait_ms = 10u64;
@@ -233,7 +233,10 @@ fn copy_only(content: String) {
     }
     if !success {
         eprintln!("[QuickPaste] copy_only: failed to write {} bytes after attempts", content_len);
+    } else {
+        println!("[QuickPaste] copy_only: succeeded ({} bytes)", content_len);
     }
+    success
 }
 
 #[tauri::command]
