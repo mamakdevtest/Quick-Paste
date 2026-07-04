@@ -17,12 +17,5 @@
   "15": "escapeHtml",
   "16": "formatCharCount",
   "17": "build.rs",
-  "18": "main.rs",
-  "19": "applyTheme",
-  "20": "AppHandle",
-  "21": "Mutex",
-  "22": "Self",
-  "23": "Option",
-  "24": "Vec",
-  "25": "tailwind.config.js"
+  "18": "main.rs"
 }

@@ -48,8 +48,57 @@
       display: flex; flex-direction: column;
       width: 100vw; height: 100vh;
       border-radius: 12px; overflow: hidden;
+      transition: background 0.15s ease, backdrop-filter 0.15s ease;
     }
-    #bodyArea { flex: 1; overflow: hidden; }
+    #bodyArea { flex: 1; overflow: hidden; transition: all 0.15s ease; }
+
+    /* ─── Launcher Mode ──────────────────────────────────────────────────────── */
+    body.launcher-mode {
+      background: transparent !important;
+    }
+    body.launcher-mode #mainContainer {
+      background: rgba(18, 18, 24, 0.65) !important;
+      backdrop-filter: blur(24px) !important;
+      -webkit-backdrop-filter: blur(24px) !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0;
+      border: none;
+    }
+    body.launcher-mode #bodyArea {
+      flex: none;
+      width: 680px;
+      height: 520px;
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+    body.launcher-mode.dark #bodyArea {
+      background: #1a1b23;
+      border-color: #2f313d;
+    }
+    body.launcher-mode.light #bodyArea {
+      background: #f2ecf4;
+      border-color: #cbc4d2;
+    }
+    body.launcher-mode #panelTrack {
+      width: 100% !important;
+      transform: none !important;
+    }
+    body.launcher-mode #listPanel {
+      width: 100% !important;
+    }
+    body.launcher-mode #dashboardBtn,
+    body.launcher-mode #settingsBtn,
+    body.launcher-mode #pinWindowBtn,
+    body.launcher-mode #openLauncherBtn {
+      display: none !important;
+    }
+    body.launcher-mode #openSettingsBtn {
+      display: flex !important;
+    }
 
     /* ─── Snippet card left stripe ──────────────────────────────────────────── */
     .snippet-card { position: relative; }
@@ -351,10 +400,20 @@
           <div class="w-1 bg-blue-400 rounded-sm"></div>
         </div>
       </button>
-      <!-- Settings button -->
+      <!-- Open Launcher button (Main Window) -->
+      <button id="openLauncherBtn" title="Open Quick Launcher (Alt+Q)"
+        class="w-7 h-7 rounded flex items-center justify-center text-d-dim dark:hover:bg-d-hover hover:text-d-text transition-colors">
+        <span class="material-symbols-outlined" style="font-size:20px;">bolt</span>
+      </button>
+      <!-- Settings button (Main Window) -->
       <button id="settingsBtn" title="Settings"
         class="w-7 h-7 rounded flex items-center justify-center text-d-dim dark:hover:bg-d-hover hover:text-d-text transition-colors">
         <span class="material-symbols-outlined" style="font-size:20px;">settings</span>
+      </button>
+      <!-- Open Settings button (Launcher Window) -->
+      <button id="openSettingsBtn" title="Open Full Settings (Alt+W)"
+        class="w-7 h-7 rounded hidden items-center justify-center text-d-dim dark:hover:bg-d-hover hover:text-d-text transition-colors">
+        <span class="material-symbols-outlined" style="font-size:20px;">tune</span>
       </button>
       <!-- Close button -->
       <button id="closeBtn" title="Close"

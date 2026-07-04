@@ -53,13 +53,14 @@ fn reregister_all_shortcuts(app: &AppHandle) -> Result<(), String> {
     let global_shortcut = app.global_shortcut();
     let _ = global_shortcut.unregister_all();
 
-    // Register main app hotkey
-    let settings = data_store::load_settings();
-    let hotkey_raw = settings.hotkey.clone();
-    let hotkey_str = if hotkey_raw.is_empty() { "alt+q" } else { &hotkey_raw };
-    let formatted_hotkey = format_hotkey(hotkey_str);
-    if let Ok(shortcut) = Shortcut::from_str(&formatted_hotkey) {
-        let _ = global_shortcut.register(shortcut);
+    // Register Alt+W hotkey
+    if let Ok(alt_w) = Shortcut::from_str("Alt+W") {
+        let _ = global_shortcut.register(alt_w);
+    }
+
+    // Register Alt+Q hotkey
+    if let Ok(alt_q) = Shortcut::from_str("Alt+Q") {
+        let _ = global_shortcut.register(alt_q);
     }
 
     // Register all snippet custom shortcuts
@@ -115,6 +116,7 @@ fn save_snippets(app: AppHandle, snippets: Vec<Snippet>) {
     data_store::save_snippets(&snippets);
     sync_triggers(&snippets);
     let _ = reregister_all_shortcuts(&app);
+    let _ = app.emit("snippets-updated", ());
 }
 
 #[tauri::command]
@@ -263,6 +265,7 @@ fn import_data(app: AppHandle) -> Result<Option<ImportedData>, String> {
     sync_triggers(&snippets);
 
     let _ = reregister_all_shortcuts(&app);
+    let _ = app.emit("snippets-updated", ());
 
     Ok(Some(ImportedData { snippets, settings }))
 }
@@ -279,6 +282,7 @@ fn clear_all_data(app: AppHandle) {
     data_store::save_settings(&Settings::default());
     sync_triggers(&[]);
     let _ = reregister_all_shortcuts(&app);
+    let _ = app.emit("snippets-updated", ());
 }
 
 #[tauri::command]
@@ -344,6 +348,21 @@ fn store_own_hwnd(state: State<'_, AppState>) {
     }
 }
 
+#[tauri::command]
+fn open_launcher_window(app: AppHandle, state: State<'_, AppState>) {
+    if let Some(win) = app.get_webview_window("launcher") {
+        show_window(&win, &state);
+        let _ = win.emit("focus-search", ());
+    }
+}
+
+#[tauri::command]
+fn open_main_window(app: AppHandle, state: State<'_, AppState>) {
+    if let Some(win) = app.get_webview_window("main") {
+        show_window(&win, &state);
+    }
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // App Entry
 // ──────────────────────────────────────────────────────────────────────────────
@@ -356,21 +375,33 @@ pub fn run() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
-                        let settings = data_store::load_settings();
-                        let hotkey_raw = settings.hotkey.clone();
-                        let hotkey_str = if hotkey_raw.is_empty() { "alt+q" } else { &hotkey_raw };
-                        let formatted_hotkey = format_hotkey(hotkey_str);
-
-                        // Check if main app toggle hotkey is pressed
-                        if let Ok(app_shortcut) = Shortcut::from_str(&formatted_hotkey) {
-                            if shortcut == &app_shortcut {
+                        let state = app.state::<AppState>();
+                        
+                        // Check Alt+W (Normal Settings/Sidebar window)
+                        if let Ok(alt_w_shortcut) = Shortcut::from_str("Alt+W") {
+                            if shortcut == &alt_w_shortcut {
                                 if let Some(win) = app.get_webview_window("main") {
                                     let is_visible = win.is_visible().unwrap_or(false);
-                                    let state = app.state::<AppState>();
                                     if is_visible {
                                         let _ = win.hide();
                                     } else {
                                         show_window(&win, &state);
+                                    }
+                                }
+                                return;
+                            }
+                        }
+
+                        // Check Alt+Q (Launcher overlay window)
+                        if let Ok(alt_q_shortcut) = Shortcut::from_str("Alt+Q") {
+                            if shortcut == &alt_q_shortcut {
+                                if let Some(win) = app.get_webview_window("launcher") {
+                                    let is_visible = win.is_visible().unwrap_or(false);
+                                    if is_visible {
+                                        let _ = win.hide();
+                                    } else {
+                                        show_window(&win, &state);
+                                        let _ = win.emit("focus-search", ());
                                     }
                                 }
                                 return;
@@ -499,6 +530,8 @@ pub fn run() {
             store_own_hwnd,
             set_autostart,
             set_window_opacity,
+            open_launcher_window,
+            open_main_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

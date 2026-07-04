@@ -5,8 +5,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1783154156.572254,
-    "ast_hash": "63c6ec5d5f08572a6ed6bbd86f6bec1d",
+    "mtime": 1782990980.8929374,
+    "ast_hash": "ef21567c2ea5c20cd101f1a0c53eb5c7",
     "semantic_hash": ""
   },
   "src-tauri/build.rs": {
@@ -50,8 +50,8 @@
     "semantic_hash": ""
   },
   "src-tauri/tauri.conf.json": {
-    "mtime": 1783153880.4291983,
-    "ast_hash": "6ef78c0dd2304007b7e21b734779394b",
+    "mtime": 1783017152.2805161,
+    "ast_hash": "5d1d45396a6dd54d25049da825a22fd7",
     "semantic_hash": ""
   },
   "src/features.js": {
@@ -60,8 +60,8 @@
     "semantic_hash": ""
   },
   "src/main.js": {
-    "mtime": 1783155517.6397445,
-    "ast_hash": "dcbb249dc252242eb75b5534cc78cf39",
+    "mtime": 1783016919.6937404,
+    "ast_hash": "3e150402d88e89f850830d57e9b0bd38",
     "semantic_hash": ""
   },
   "AboutProject.md": {
@@ -80,8 +80,8 @@
     "semantic_hash": ""
   },
   "src/index.html": {
-    "mtime": 1783155499.5554855,
-    "ast_hash": "3982a11a8b7f50a453fe77155da940d9",
+    "mtime": 1783016388.8112237,
+    "ast_hash": "08404c2b182a5ac92547b37506df700c",
     "semantic_hash": ""
   },
   "src-tauri/icons/128x128.png": {
@@ -162,11 +162,6 @@
   "src/assets/tauri.svg": {
     "mtime": 1782837945.6285038,
     "ast_hash": "f0966ff85db99f2d00771f92d18c9e7f",
-    "semantic_hash": ""
-  },
-  "tailwind.config.js": {
-    "mtime": 1783153898.4680183,
-    "ast_hash": "94a6a602a858ee407c10a6b19899d4c0",
     "semantic_hash": ""
   }
 }

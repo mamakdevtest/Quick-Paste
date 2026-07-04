@@ -63,6 +63,8 @@ const bulkActionBar   = document.getElementById('bulkActionBar');
 const selectedCount   = document.getElementById('selectedCount');
 const bulkDeleteBtn   = document.getElementById('bulkDeleteBtn');
 const bulkCancelBtn   = document.getElementById('bulkCancelBtn');
+const openLauncherBtn = document.getElementById('openLauncherBtn');
+const openSettingsBtn = document.getElementById('openSettingsBtn');
 
 // Settings UI
 const autoPasteToggle        = document.getElementById('autoPasteToggle');
@@ -117,46 +119,68 @@ function showToast(msg, duration = 1600, type = 'success') {
 
 // ─── Initialize ────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  const windowLabel = appWindow.label;
+  
+  if (windowLabel === 'launcher') {
+    document.body.classList.add('launcher-mode');
+    
+    // Listen for focus-search events from Rust
+    await listen('focus-search', async () => {
+      await reloadData();
+      setTimeout(() => searchInput.focus(), 80);
+    });
+  }
+
   appSettings = await invoke('load_settings');
   applySettings(appSettings);
 
   await reloadData();
 
-  const storagePath = await invoke('get_storage_path');
-  storagePathLabel.textContent = storagePath;
+  // Listen for snippets updates across windows (sync Alt+W with Alt+Q)
+  await listen('snippets-updated', async () => {
+    await reloadData();
+  });
+
+  if (windowLabel === 'main') {
+    const storagePath = await invoke('get_storage_path');
+    storagePathLabel.textContent = storagePath;
+  }
 
   searchInput.focus();
 
-  await listen('new-clipboard-entry', async (event) => {
-    const payload = event.payload;
-    const isVisible = await appWindow.isVisible();
-    if (isVisible) {
-      deferredClipboardText = payload;
-    } else {
-      await processClipboardEntry(payload);
-    }
-  });
+  // Run main background listeners only in main window
+  if (windowLabel === 'main') {
+    await listen('new-clipboard-entry', async (event) => {
+      const payload = event.payload;
+      const isVisible = await appWindow.isVisible();
+      if (isVisible) {
+        deferredClipboardText = payload;
+      } else {
+        await processClipboardEntry(payload);
+      }
+    });
 
-  // Listen for opacity events from Rust
-  await listen('set-opacity', (event) => {
-    const val = event.payload;
-    mainContainer.style.opacity = val;
-  });
+    // Listen for opacity events from Rust
+    await listen('set-opacity', (event) => {
+      const val = event.payload;
+      mainContainer.style.opacity = val;
+    });
+
+    // Periodically refresh active process for context-aware suggestions
+    setInterval(async () => {
+      try {
+        const currentApp = await invoke('get_active_process_name');
+        if (currentApp && !currentApp.toLowerCase().includes('quickpaste')) {
+          activeProcessName = currentApp;
+        }
+      } catch { /* ignored */ }
+    }, 3000);
+  }
 
   setupShortcutCapture();
   setupHotkeyCapture();
   setupColorPicker();
   setupThemePicker();
-
-  // Periodically refresh active process for context-aware suggestions
-  setInterval(async () => {
-    try {
-      const currentApp = await invoke('get_active_process_name');
-      if (currentApp && !currentApp.toLowerCase().includes('quickpaste')) {
-        activeProcessName = currentApp;
-      }
-    } catch { /* ignored */ }
-  }, 3000);
 });
 
 // ─── Settings ──────────────────────────────────────────────────────────────────
@@ -695,10 +719,16 @@ async function selectAndPaste(index) {
 let firstFocus = true;
 
 window.addEventListener('blur', async () => {
+  if (appWindow.label === 'launcher') {
+    await appWindow.hide();
+    return;
+  }
+
   if (deferredClipboardText) {
     await processClipboardEntry(deferredClipboardText);
     deferredClipboardText = null;
   }
+
   if (pinnedWindow) return;
   // Prevent hide if select dropdown or input is active (avoids WebView2 dropdown blur bug)
   if (document.activeElement && (document.activeElement.tagName === 'SELECT' || document.activeElement.tagName === 'INPUT')) {
@@ -718,6 +748,9 @@ window.addEventListener('focus', async () => {
     firstFocus = false;
     await invoke('store_own_hwnd');
   }
+  
+  // Guarantee fresh data when switching to this window
+  await reloadData();
 });
 
 async function processClipboardEntry(payload) {
@@ -776,6 +809,20 @@ pinWindowBtn.addEventListener('click', () => {
   invoke('set_pinned', { value: pinnedWindow });
   showToast(pinnedWindow ? 'Window pinned' : 'Window unpinned');
 });
+
+if (openLauncherBtn) {
+  openLauncherBtn.addEventListener('click', async () => {
+    await appWindow.hide();
+    await invoke('open_launcher_window');
+  });
+}
+
+if (openSettingsBtn) {
+  openSettingsBtn.addEventListener('click', async () => {
+    await appWindow.hide();
+    await invoke('open_main_window');
+  });
+}
 
 // (Settings btn logic moved to bottom)
 
