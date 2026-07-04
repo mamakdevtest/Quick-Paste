@@ -74,17 +74,9 @@ fn reregister_all_shortcuts(app: &AppHandle) -> Result<(), String> {
     let global_shortcut = app.global_shortcut();
     let _ = global_shortcut.unregister_all();
 
-    // Register Alt+W hotkey
-    if let Ok(alt_w) = Shortcut::from_str("Alt+W") {
-        let _ = global_shortcut.register(alt_w);
-    }
-
-    // Register Alt+Q and Ctrl+Q hotkeys
+    // Register single app hotkey: Alt+Q (rebinding previous Alt+W behavior). Launcher overlay disabled.
     if let Ok(alt_q) = Shortcut::from_str("Alt+Q") {
         let _ = global_shortcut.register(alt_q);
-    }
-    if let Ok(ctrl_q) = Shortcut::from_str("Ctrl+Q") {
-        let _ = global_shortcut.register(ctrl_q);
     }
 
     // Register all snippet custom shortcuts
@@ -444,9 +436,9 @@ pub fn run() {
                     if event.state() == ShortcutState::Pressed {
                         let state = app.state::<AppState>();
                         
-                        // Check Alt+W (Normal Settings/Sidebar window)
-                        if let Ok(alt_w_shortcut) = Shortcut::from_str("Alt+W") {
-                            if shortcut == &alt_w_shortcut {
+                        // Check Alt+Q (Main window toggle — previously Alt+W)
+                        if let Ok(alt_q_shortcut) = Shortcut::from_str("Alt+Q") {
+                            if shortcut == &alt_q_shortcut {
                                 if let Some(win) = app.get_webview_window("main") {
                                     let is_visible = win.is_visible().unwrap_or(false);
                                     if is_visible {
@@ -459,36 +451,8 @@ pub fn run() {
                             }
                         }
 
-                        // Check Alt+Q (Launcher overlay window)
-                        if let Ok(alt_q_shortcut) = Shortcut::from_str("Alt+Q") {
-                            if shortcut == &alt_q_shortcut {
-                                if let Some(win) = app.get_webview_window("launcher") {
-                                    let is_visible = win.is_visible().unwrap_or(false);
-                                    if is_visible {
-                                        let _ = win.hide();
-                                    } else {
-                                        show_window(&win, &state);
-                                        let _ = win.emit("focus-search", ());
-                                    }
-                                }
-                                return;
-                            }
-                        }
-                        // Check Ctrl+Q as alternative launcher shortcut
-                        if let Ok(ctrl_q_shortcut) = Shortcut::from_str("Ctrl+Q") {
-                            if shortcut == &ctrl_q_shortcut {
-                                if let Some(win) = app.get_webview_window("launcher") {
-                                    let is_visible = win.is_visible().unwrap_or(false);
-                                    if is_visible {
-                                        let _ = win.hide();
-                                    } else {
-                                        show_window(&win, &state);
-                                        let _ = win.emit("focus-search", ());
-                                    }
-                                }
-                                return;
-                            }
-                        }
+                        // Launcher overlay shortcuts disabled (Alt+Q/Ctrl+Q removed)
+                        // The app now uses Alt+Q to toggle the main window (previously Alt+W).
 
                         // Check if one of the snippet custom hotkeys is pressed
                         let snippets = data_store::load_snippets();
