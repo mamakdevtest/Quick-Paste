@@ -26,6 +26,10 @@ serde_json = "1.0.150"
 arboard = "3.6.1"
 dirs = "6.0.0"
 rfd = { version = "0.15.4", features = ["file-handle-inner"] }
+chrono = { version = "0.4.42", features = ["clock", "serde"] }
+rand = "0.8.5"
+unicode-segmentation = "1.12.0"
+uuid = { version = "1.11.0", features = ["v4", "serde"] }
 windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
     "Win32_System_Registry",
@@ -34,4 +38,3 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_UI_Input_KeyboardAndMouse"
 ] }
 winreg = "0.55.0"
-

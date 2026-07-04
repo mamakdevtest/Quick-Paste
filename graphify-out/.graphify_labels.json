@@ -23,5 +23,8 @@
   "21": "Option",
   "22": "String",
   "23": "Vec",
-  "25": "tailwind.config.js"
+  "24": "Self",
+  "25": "tailwind.config.js",
+  "26": "String",
+  "27": "Vec"
 }

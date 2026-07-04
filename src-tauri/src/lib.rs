@@ -13,12 +13,14 @@ use winreg::RegKey;
 mod clipboard_manager;
 mod clipboard_monitor;
 mod data_store;
+mod text_expansion;
 
 #[cfg(target_os = "windows")]
 mod keyboard_hook;
 
 
 use data_store::{Snippet, Settings};
+use text_expansion::TextExpansion;
 
 struct AppState {
     own_hwnd: Mutex<isize>,
@@ -130,7 +132,6 @@ fn load_snippets() -> Vec<Snippet> {
 #[tauri::command]
 fn save_snippets(app: AppHandle, snippets: Vec<Snippet>) {
     data_store::save_snippets(&snippets);
-    sync_triggers(&snippets);
     let _ = reregister_all_shortcuts(&app);
     let _ = app.emit("snippets-updated", ());
 }
@@ -141,6 +142,85 @@ fn get_storage_path() -> String {
         .parent()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|| "Unknown".to_string())
+}
+
+#[tauri::command]
+fn get_active_process_name() -> String {
+    clipboard_manager::get_active_process_name()
+}
+
+#[tauri::command]
+fn load_text_expansions() -> Vec<TextExpansion> {
+    text_expansion::load_text_expansions()
+}
+
+#[tauri::command]
+fn save_text_expansions(app: AppHandle, items: Vec<TextExpansion>) -> Result<Vec<TextExpansion>, String> {
+    let saved = text_expansion::save_text_expansions(&items)?;
+    let _ = app.emit("text-expansions-updated", ());
+    Ok(saved)
+}
+
+#[tauri::command]
+fn export_text_expansions(locale: Option<String>) -> Result<bool, String> {
+    use std::fs;
+
+    let export_title = if is_turkish_locale(locale.as_deref()) {
+        "Metin Genişletmeleri Dışa Aktar"
+    } else {
+        "Export Text Expansions"
+    };
+
+    let Some(path) = rfd::FileDialog::new()
+        .set_title(export_title)
+        .set_file_name("text_expansions.json")
+        .add_filter("JSON Backup", &["json"])
+        .save_file()
+    else {
+        return Ok(false);
+    };
+
+    let items = text_expansion::current_snapshot();
+    let out = text_expansion::export_payload(&items)?;
+    fs::write(&path, out).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn import_text_expansions(app: AppHandle, locale: Option<String>) -> Result<Option<Vec<TextExpansion>>, String> {
+    use std::fs;
+
+    let import_title = if is_turkish_locale(locale.as_deref()) {
+        "Metin Genişletmeleri İçe Aktar"
+    } else {
+        "Import Text Expansions"
+    };
+
+    let Some(path) = rfd::FileDialog::new()
+        .set_title(import_title)
+        .add_filter("JSON Backup", &["json"])
+        .pick_file()
+    else {
+        return Ok(None);
+    };
+
+    let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let imported = text_expansion::import_payload(&raw)?;
+    let _ = app.emit("text-expansions-updated", ());
+    Ok(Some(imported))
+}
+
+#[tauri::command]
+fn reset_text_expansions(app: AppHandle) -> Result<Vec<TextExpansion>, String> {
+    let items = text_expansion::reset_text_expansions()?;
+    let _ = app.emit("text-expansions-updated", ());
+    Ok(items)
+}
+
+fn is_turkish_locale(locale: Option<&str>) -> bool {
+    locale
+        .map(|value| value.to_lowercase().starts_with("tr"))
+        .unwrap_or(false)
 }
 
 #[tauri::command]
@@ -266,6 +346,7 @@ fn export_data() -> Result<(), String> {
     use std::fs;
     let snippets_src = data_store::get_snippets_path();
     let settings_src = data_store::get_settings_path();
+    let text_expansions = text_expansion::current_snapshot();
 
     let Some(path) = rfd::FileDialog::new()
         .set_title("Export QuickPaste Backup")
@@ -283,10 +364,14 @@ fn export_data() -> Result<(), String> {
         .unwrap_or(serde_json::Value::Array(vec![]));
     let settings_json: serde_json::Value = serde_json::from_str(&settings_raw)
         .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+    let text_expansions_json = serde_json::to_value(text_expansions)
+        .unwrap_or(serde_json::Value::Array(vec![]));
 
     let bundle = serde_json::json!({
+        "version": 2,
         "snippets": snippets_json,
-        "settings": settings_json
+        "settings": settings_json,
+        "text_expansions": text_expansions_json,
     });
 
     let out = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
@@ -319,29 +404,52 @@ fn import_data(app: AppHandle) -> Result<Option<ImportedData>, String> {
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default();
 
+    let text_expansions_from_bundle: Option<Vec<TextExpansion>> = bundle
+        .get("text_expansions")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .or_else(|| {
+            bundle
+                .get("textExpansions")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+        });
+
     data_store::save_snippets(&snippets);
     data_store::save_settings(&settings);
-    sync_triggers(&snippets);
+
+    let imported_expansions = match text_expansions_from_bundle {
+        Some(items) => text_expansion::replace_runtime(items)?,
+        None => {
+            let seeded = text_expansion::build_seeded_text_expansions(&snippets);
+            text_expansion::replace_runtime(seeded)?
+        }
+    };
 
     let _ = reregister_all_shortcuts(&app);
     let _ = app.emit("snippets-updated", ());
+    let _ = app.emit("text-expansions-updated", ());
 
-    Ok(Some(ImportedData { snippets, settings }))
+    Ok(Some(ImportedData {
+        snippets,
+        settings,
+        text_expansions: imported_expansions,
+    }))
 }
 
 #[derive(serde::Serialize)]
 struct ImportedData {
     snippets: Vec<Snippet>,
     settings: Settings,
+    text_expansions: Vec<TextExpansion>,
 }
 
 #[tauri::command]
 fn clear_all_data(app: AppHandle) {
     data_store::save_snippets(&[]);
     data_store::save_settings(&Settings::default());
-    sync_triggers(&[]);
+    let _ = text_expansion::reset_text_expansions();
     let _ = reregister_all_shortcuts(&app);
     let _ = app.emit("snippets-updated", ());
+    let _ = app.emit("text-expansions-updated", ());
 }
 
 #[tauri::command]
@@ -515,7 +623,7 @@ pub fn run() {
 
             // Sync triggers and start low-level keyboard hook on Windows
             let snippets = data_store::load_snippets();
-            sync_triggers(&snippets);
+            let _ = text_expansion::bootstrap_runtime(&snippets);
             #[cfg(target_os = "windows")]
             keyboard_hook::start_keyboard_hook();
 
@@ -601,6 +709,12 @@ pub fn run() {
             load_snippets,
             save_snippets,
             get_storage_path,
+            get_active_process_name,
+            load_text_expansions,
+            save_text_expansions,
+            export_text_expansions,
+            import_text_expansions,
+            reset_text_expansions,
             capture_foreground_window,
             copy_and_paste,
             copy_only,
@@ -632,25 +746,5 @@ fn format_hotkey(hotkey: &str) -> String {
         })
         .collect::<Vec<String>>()
         .join("+")
-}
-
-fn sync_triggers(snippets: &[data_store::Snippet]) {
-    #[cfg(target_os = "windows")]
-    {
-        let list: Vec<(String, String)> = snippets
-            .iter()
-            .filter_map(|s| {
-                s.trigger.as_ref().and_then(|t| {
-                    let trimmed = t.trim();
-                    if !trimmed.is_empty() {
-                        Some((trimmed.to_string(), s.content.clone()))
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect();
-        keyboard_hook::update_triggers(list);
-    }
 }
 

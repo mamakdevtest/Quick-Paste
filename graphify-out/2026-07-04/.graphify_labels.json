@@ -19,5 +19,9 @@
   "17": "build.rs",
   "18": "main.rs",
   "19": "Tauri + Vanilla",
+  "20": "Mutex",
+  "21": "Option",
+  "22": "String",
+  "23": "Vec",
   "25": "tailwind.config.js"
 }

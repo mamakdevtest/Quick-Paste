@@ -33,14 +33,15 @@
     /* ─── Panel sliding ─────────────────────────────────────────────────────── */
     #panelTrack {
       display: flex; flex-direction: row;
-      width: 300%; height: 100%;
+      width: 400%; height: 100%;
       transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    #panelTrack.settings-open  { transform: translateX(-33.333%); }
-    #panelTrack.dashboard-open { transform: translateX(-66.666%); }
+    #panelTrack.settings-open  { transform: translateX(-25%); }
+    #panelTrack.text-expansion-open { transform: translateX(-50%); }
+    #panelTrack.dashboard-open { transform: translateX(-75%); }
 
-    #listPanel, #settingsScroll, #dashboardScroll {
-      width: 33.333%; flex-shrink: 0; height: 100%; overflow-y: auto;
+    #listPanel, #settingsScroll, #textExpansionScroll, #dashboardScroll {
+      width: 25%; flex-shrink: 0; height: 100%; overflow-y: auto;
     }
 
     /* ─── Main layout ───────────────────────────────────────────────────────── */
@@ -118,6 +119,7 @@
     }
     body.launcher-mode #settingsBtn,
     body.launcher-mode #openLauncherBtn,
+    body.launcher-mode #textExpansionBtn,
     body.launcher-mode #addBtn {
       display: none !important;
     }
@@ -425,6 +427,10 @@
           <div class="w-1 bg-blue-400 rounded-sm"></div>
         </div>
       </button>
+      <button id="textExpansionBtn" title="Text Expansion"
+        class="w-7 h-7 rounded flex items-center justify-center text-d-dim dark:hover:bg-d-hover hover:text-d-text transition-colors">
+        <span class="material-symbols-outlined" style="font-size:20px;">text_snippet</span>
+      </button>
       <!-- Open Launcher button (Main Window) - disabled/hidden -->
       <button id="openLauncherBtn" title="Quick Launcher (disabled)"
         class="w-7 h-7 rounded hidden items-center justify-center text-d-dim dark:hover:bg-d-hover hover:text-d-text transition-colors">
@@ -572,6 +578,24 @@
             </div>
           </div>
 
+          <!-- TEXT EXPANSION -->
+          <div>
+            <p id="textExpansionSectionLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">Text Tools</p>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">text_snippet</span>
+                <span id="textExpansionCardTitle" class="font-semibold text-sm dark:text-d-text">Text Expansion</span>
+              </div>
+              <p id="textExpansionCardDescription" class="text-xs dark:text-d-dim ml-5">
+                Manage system-wide triggers, app filters, and dynamic variables.
+              </p>
+              <button id="openTextExpansionBtn"
+                class="mt-3 ml-5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-d-primary text-black hover:opacity-90 transition-opacity">
+                Open Text Expansion
+              </button>
+            </div>
+          </div>
+
           <!-- APPEARANCE -->
           <div>
             <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">Appearance</p>
@@ -684,6 +708,182 @@
             <div class="mt-1 text-[10px] opacity-60">Ctrl+K — Command Palette</div>
           </div>
 
+        </div>
+      </div>
+
+      <!-- ─────────────────────────────────── PANEL 3: TEXT EXPANSION -->
+      <div id="textExpansionScroll" class="dark:bg-d-bg overflow-y-auto">
+        <div class="p-4 flex flex-col gap-4 h-full min-h-0">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p id="textExpansionPanelLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-1">Text Expansion</p>
+              <h3 id="textExpansionPanelTitle" class="text-lg font-bold dark:text-d-text">System-wide snippets</h3>
+              <p id="textExpansionPanelDescription" class="text-xs dark:text-d-dim mt-1 max-w-xl">
+                Type a trigger in any app, then press Space, Enter, Tab, or punctuation to expand it instantly.
+              </p>
+            </div>
+            <div class="flex flex-wrap justify-end gap-2">
+              <button id="textExpansionDefaultsBtn"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
+                Defaults
+              </button>
+              <button id="textExpansionImportBtn"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
+                Import
+              </button>
+              <button id="textExpansionExportBtn"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
+                Export
+              </button>
+              <button id="textExpansionBackBtn"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-d-primary text-black hover:opacity-90 transition-opacity">
+                Back
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-d-dim pointer-events-none" style="font-size:16px;">search</span>
+              <input type="text" id="textExpansionSearchInput" placeholder="Search triggers, replacements, app filters..."
+                autocomplete="off"
+                class="w-full dark:bg-d-input dark:border-d-border dark:text-d-text dark:placeholder-d-dim border rounded-md pl-8 pr-3 py-1.5 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-sans"/>
+            </div>
+            <button id="textExpansionAddBtn"
+              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-3 py-1.5 flex items-center gap-1 dark:hover:bg-d-hover transition-colors text-xs whitespace-nowrap">
+              <span class="material-symbols-outlined" style="font-size:14px;">add</span>
+              New
+            </button>
+          </div>
+
+          <div class="grid grid-cols-[1.08fr_1fr] gap-4 flex-1 min-h-0">
+            <section class="dark:bg-d-card dark:border-d-border border rounded-xl overflow-hidden flex flex-col min-h-0">
+              <div class="px-3 py-2.5 border-b dark:border-d-border flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">view_list</span>
+                  <span id="textExpansionListTitle" class="font-semibold text-sm dark:text-d-text">Snippet List</span>
+                </div>
+                <span id="textExpansionCount" class="text-[10px] font-semibold dark:text-d-dim uppercase tracking-widest">0 items</span>
+              </div>
+              <div id="textExpansionList" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+                <!-- Rendered by JS -->
+              </div>
+            </section>
+
+            <section class="dark:bg-d-card dark:border-d-border border rounded-xl overflow-hidden flex flex-col min-h-0">
+              <div class="px-3 py-2.5 border-b dark:border-d-border flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">edit</span>
+                  <span id="textExpansionFormTitle" class="font-semibold text-sm dark:text-d-text">New Expansion</span>
+                </div>
+                <div class="flex gap-2">
+                  <button id="textExpansionClearBtn"
+                    class="px-2.5 py-1.5 rounded-md text-[10px] font-semibold dark:bg-d-input dark:border-d-border dark:text-d-dim border dark:hover:bg-d-hover transition-colors">
+                    New
+                  </button>
+                  <button id="textExpansionDeleteBtn"
+                    class="px-2.5 py-1.5 rounded-md text-[10px] font-semibold bg-red-600/80 text-white hover:bg-red-600 transition-colors">
+                    Delete
+                  </button>
+                  <button id="textExpansionSaveBtn"
+                    class="px-3 py-1.5 rounded-md text-[10px] font-semibold bg-d-primary text-black hover:opacity-90 transition-opacity">
+                    Save
+                  </button>
+                </div>
+              </div>
+
+              <div class="p-3 overflow-y-auto flex-1 flex flex-col gap-3">
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="flex flex-col gap-1">
+                    <label id="textExpansionTriggerLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Trigger</label>
+                    <input type="text" id="textExpansionTriggerInput" placeholder=":mail"
+                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-mono placeholder:dark:text-d-dim/50"/>
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label id="textExpansionDescriptionLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Description</label>
+                    <input type="text" id="textExpansionDescriptionInput" placeholder="Optional note"
+                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-sans placeholder:dark:text-d-dim/50"/>
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                  <label id="textExpansionReplacementLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Replacement</label>
+                  <textarea id="textExpansionReplacementInput" rows="7" placeholder="Type your replacement here..."
+                    class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none dark:focus:border-d-primary transition-colors resize-none placeholder:dark:text-d-dim/50"></textarea>
+                </div>
+
+                <div id="textExpansionConflictWarning" class="shortcut-warn hidden">
+                  ⚠ Trigger conflict detected. Same trigger cannot be saved twice.
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="dark:bg-d-input border dark:border-d-border rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-green-400">✓</span>
+                      <span id="textExpansionEnabledLabel" class="font-medium text-sm dark:text-d-text">Enabled</span>
+                    </div>
+                    <label class="qp-switch"><input type="checkbox" id="textExpansionEnabledToggle" checked><span class="qp-slider"></span></label>
+                  </div>
+                  <div class="dark:bg-d-input border dark:border-d-border rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-blue-400">Aa</span>
+                      <span id="textExpansionCaseSensitiveLabel" class="font-medium text-sm dark:text-d-text">Case Sensitive</span>
+                    </div>
+                    <label class="qp-switch"><input type="checkbox" id="textExpansionCaseSensitiveToggle"><span class="qp-slider"></span></label>
+                  </div>
+                </div>
+
+                <div class="dark:bg-d-input border dark:border-d-border rounded-xl px-4 py-3 flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <span class="text-purple-400">↔</span>
+                    <span id="textExpansionWordBoundaryLabel" class="font-medium text-sm dark:text-d-text">Word Boundary</span>
+                  </div>
+                  <label class="qp-switch"><input type="checkbox" id="textExpansionWordBoundaryToggle" checked><span class="qp-slider"></span></label>
+                </div>
+
+                <div class="dark:bg-d-card border dark:border-d-border rounded-xl p-3 flex flex-col gap-3">
+                  <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">apps</span>
+                    <span id="textExpansionAppFilterTitle" class="font-semibold text-sm dark:text-d-text">Application Filter</span>
+                  </div>
+                  <div class="grid grid-cols-[170px_1fr] gap-2">
+                    <select id="textExpansionAppFilterMode"
+                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary appearance-none cursor-pointer font-sans">
+                      <option value="all">All apps</option>
+                      <option value="unity">Only Unity</option>
+                      <option value="rider">Only Rider</option>
+                      <option value="vscode">Only VS Code</option>
+                      <option value="chrome">Only Chrome</option>
+                      <option value="custom">Custom exe names</option>
+                    </select>
+                    <input type="text" id="textExpansionAppFilterCustom" placeholder="Unity.exe, Rider64.exe, Code.exe"
+                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-mono placeholder:dark:text-d-dim/50"/>
+                  </div>
+                  <div id="textExpansionAppFilterPreview" class="text-[10px] dark:text-d-dim leading-relaxed">
+                    Matches are compared against the active process/exe name.
+                  </div>
+                </div>
+
+                <div class="dark:bg-d-card border dark:border-d-border rounded-xl p-3">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">code</span>
+                    <span id="textExpansionDynamicTitle" class="font-semibold text-sm dark:text-d-text">Dynamic Variables</span>
+                  </div>
+                  <div class="flex flex-wrap gap-2 text-[10px] font-mono">
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{date}}</span>
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{time}}</span>
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{datetime}}</span>
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{clipboard}}</span>
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{uuid}}</span>
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{random:1-100}}</span>
+                  </div>
+                  <p id="textExpansionDynamicDescription" class="text-xs dark:text-d-dim mt-2">
+                    Variables resolve when the expansion fires, not when it is saved.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
 

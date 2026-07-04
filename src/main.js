@@ -13,6 +13,7 @@ import {
   openCommandPalette, closeCommandPalette, isCommandPaletteOpen,
   executeChain,
 } from '/features.js';
+import { setupTextExpansionPanel } from '/text-expansion-panel.js';
 
 const { invoke } = window.__TAURI__.core;
 const { listen }  = window.__TAURI__.event;
@@ -23,6 +24,7 @@ const appWindow = getCurrentWindow();
 const WIN_BASE_WIDTH  = 410;  // default window width
 const WIN_BASE_HEIGHT = 800;  // default window height
 const WIN_PANEL_WIDTH = 480;  // width when a side panel (Settings/Dashboard) is open
+const WIN_TEXT_EXPANSION_WIDTH = 860; // width when Text Expansion panel is open
 
 // ─── App State ─────────────────────────────────────────────────────────────────
 let snippets         = [];
@@ -38,6 +40,7 @@ let selectedSnippets = new Set(); // indices into filteredSnippets
 let activeProcessName = null; // current foreground app name for context-aware sort
 let currentThemeId   = 'violet'; // active theme id
 let dashboardOpen    = false; // global state for dashboard visibility
+let textExpansionPanel = null;
 // Keyboard sequence state for new command-palette shortcut: Alt+Q then W
 let seqAltQPending = false;
 let seqAltQTimer = null;
@@ -139,6 +142,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   appSettings = await invoke('load_settings');
   applySettings(appSettings);
+
+  textExpansionPanel = setupTextExpansionPanel({
+    invoke,
+    listen,
+    appWindow,
+    showToast,
+    locale: navigator.language,
+    windowBaseWidth: WIN_BASE_WIDTH,
+    windowExpansionWidth: WIN_TEXT_EXPANSION_WIDTH,
+    windowHeight: WIN_BASE_HEIGHT,
+  });
+
+  window.addEventListener('text-expansion-opened', () => {
+    panelTrack.classList.remove('settings-open', 'dashboard-open');
+    if (settingsOpen) {
+      settingsOpen = false;
+      settingsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">settings</span>';
+    }
+    if (dashboardOpen) {
+      dashboardOpen = false;
+      dashboardBtn.innerHTML = `<div class="flex gap-0.5 h-3.5"><div class="w-1 bg-pink-500 rounded-sm"></div><div class="w-1 bg-green-400 rounded-sm"></div><div class="w-1 bg-blue-400 rounded-sm"></div></div>`;
+    }
+  });
 
   await reloadData();
 
@@ -903,6 +929,7 @@ clipboardImportBtn.addEventListener('click', async () => {
 // ─── Keyboard Shortcuts ───────────────────────────────────────────────────────
 window.addEventListener('keydown', async e => {
   if (e.key === 'Escape') {
+    if (textExpansionPanel?.isOpen()) { textExpansionPanel.closePanel(); return; }
     if (isCommandPaletteOpen()) { closeCommandPalette(); return; }
     if (!dialogOverlay.classList.contains('hidden')) { closeDialog(); return; }
     if (multiSelectMode) { bulkCancelBtn.click(); return; }
@@ -932,6 +959,7 @@ window.addEventListener('keydown', async e => {
 
 
   if (!dialogOverlay.classList.contains('hidden')) return;
+  if (textExpansionPanel?.isOpen()) return;
   if (settingsOpen) return;
 
   // 0. Command Palette (Alt+Q then W)
@@ -1771,6 +1799,9 @@ function updateDashboardStats() {
 const dashboardBtn = document.getElementById('dashboardBtn');
 
 dashboardBtn.addEventListener('click', () => {
+  if (textExpansionPanel?.isOpen()) {
+    textExpansionPanel.closePanel();
+  }
   dashboardOpen = !dashboardOpen;
   
   if (dashboardOpen) {
@@ -1801,6 +1832,9 @@ dashboardBtn.addEventListener('click', () => {
 
 // Update settingsBtn listener to handle dashboard panel toggle state
 settingsBtn.addEventListener('click', () => {
+  if (textExpansionPanel?.isOpen()) {
+    textExpansionPanel.closePanel();
+  }
   settingsOpen = !settingsOpen;
   
   if (settingsOpen) {
