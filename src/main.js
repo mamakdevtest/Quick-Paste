@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await reloadData();
 
-  // Listen for snippets updates across windows (sync Alt+W with Alt+Q)
+  // Listen for snippets updates across windows (hotkey now Alt+Q)
   await listen('snippets-updated', async () => {
     await reloadData();
   });
