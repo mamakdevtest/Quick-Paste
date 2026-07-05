@@ -80,8 +80,8 @@
     "semantic_hash": ""
   },
   "src/index.html": {
-    "mtime": 1783263731.341012,
-    "ast_hash": "79eacccd0f2ec83b9e0d4795f536169e",
+    "mtime": 1783268422.816143,
+    "ast_hash": "2588ace18ebe3aba1769c3bd2375d4ae",
     "semantic_hash": ""
   },
   "src-tauri/icons/128x128.png": {
@@ -190,13 +190,13 @@
     "semantic_hash": ""
   },
   "src/suggestions.js": {
-    "mtime": 1783265980.6817079,
-    "ast_hash": "fbfcd07bb301a825d88d559627784b0c",
+    "mtime": 1783268474.4878552,
+    "ast_hash": "a22655696c926ebcd5524f5b1514ff53",
     "semantic_hash": ""
   },
   "src/welcome.js": {
-    "mtime": 1783263565.810314,
-    "ast_hash": "2dbbf2680e8af841610b9196e19580f7",
+    "mtime": 1783268468.0907705,
+    "ast_hash": "f90fae5a769cdc15788402d182cc8b0d",
     "semantic_hash": ""
   },
   "src-tauri/defaults/text_expansion_catalog.txt": {
@@ -205,13 +205,38 @@
     "semantic_hash": ""
   },
   "src/suggestions.html": {
-    "mtime": 1783265980.6797059,
-    "ast_hash": "99a23d909079906833016687e0437a9a",
+    "mtime": 1783268400.0459926,
+    "ast_hash": "01386279bcdea1ec0ac89021e6a5283d",
     "semantic_hash": ""
   },
   "src/welcome.html": {
-    "mtime": 1783263270.9701467,
-    "ast_hash": "934b1ce442a15b0d78d1deaeabb0cc14",
+    "mtime": 1783268377.8303735,
+    "ast_hash": "0d3c08ad5c092450b3e5785a3c27f23b",
+    "semantic_hash": ""
+  },
+  ".codex/skills/design-system-guardian/SKILL.md": {
+    "mtime": 1783267567.127469,
+    "ast_hash": "87d41fd4d2cd1376e1c7f778d9c7e6dc",
+    "semantic_hash": ""
+  },
+  ".codex/skills/desktop-ui-ux/SKILL.md": {
+    "mtime": 1783267567.1264687,
+    "ast_hash": "416ba20fe9a8e75f25c5033854d2044b",
+    "semantic_hash": ""
+  },
+  ".codex/skills/visual-ui-review/SKILL.md": {
+    "mtime": 1783267567.1284726,
+    "ast_hash": "2308caeeba040c68fdb7620b5164db44",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1783267567.1294699,
+    "ast_hash": "93631ce9c46feb67d2624136d0d48631",
+    "semantic_hash": ""
+  },
+  "tasarim.md": {
+    "mtime": 1783271333.5121932,
+    "ast_hash": "ec8a3f85aa27e549a81fb1524af13d97",
     "semantic_hash": ""
   }
 }

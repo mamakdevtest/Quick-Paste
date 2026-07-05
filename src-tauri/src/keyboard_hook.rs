@@ -2,14 +2,16 @@ use std::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl};
+use windows_sys::Win32::Foundation::POINT;
+use windows_sys::Win32::Graphics::Gdi::ClientToScreen;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, GetKeyboardState, MapVirtualKeyW, SendInput, ToUnicode, INPUT, INPUT_KEYBOARD,
     KEYBDINPUT, MAPVK_VK_TO_VSC,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx, WH_KEYBOARD_LL,
-    KBDLLHOOKSTRUCT, MSG, WM_KEYDOWN, WM_SYSKEYDOWN,
+    CallNextHookEx, GetGUIThreadInfo, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
+    GUITHREADINFO, WH_KEYBOARD_LL, KBDLLHOOKSTRUCT, MSG, WM_KEYDOWN, WM_SYSKEYDOWN,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -34,6 +36,11 @@ const VK_RMENU: u32 = 0xA5;
 
 const LLKHF_LOWER_IL_INJECTED: u32 = 0x02;
 const LLKHF_INJECTED: u32 = 0x10;
+const SUGGESTION_WIDTH: f64 = 340.0;
+const SUGGESTION_MIN_HEIGHT: f64 = 152.0;
+const SUGGESTION_MAX_HEIGHT: f64 = 420.0;
+const SUGGESTION_GAP: f64 = 10.0;
+const SCREEN_PADDING: f64 = 12.0;
 
 static SUSPEND_COUNT: AtomicUsize = AtomicUsize::new(0);
 static TYPED_BUFFER: Mutex<String> = Mutex::new(String::new());
@@ -82,6 +89,25 @@ fn normalize_query_key(value: &str) -> String {
     value.trim().trim_start_matches(':').to_lowercase()
 }
 
+fn active_suggestion_token(buffer: &str) -> Option<String> {
+    let trimmed = buffer.trim_end_matches(|ch: char| ch.is_whitespace());
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let token = trimmed
+        .rsplit(|ch: char| ch.is_whitespace())
+        .next()
+        .unwrap_or_default()
+        .trim();
+
+    if !token.starts_with(':') || token.graphemes(true).count() < 2 {
+        return None;
+    }
+
+    Some(token.to_string())
+}
+
 fn current_target_window() -> isize {
     let hwnd = clipboard_manager::get_foreground_window();
     if hwnd != 0 && !clipboard_manager::is_system_window(hwnd) {
@@ -97,8 +123,8 @@ fn ensure_suggestion_window(app: &AppHandle) -> Result<tauri::WebviewWindow, Str
 
     tauri::WebviewWindowBuilder::new(app, "suggestions", WebviewUrl::App("suggestions.html".into()))
         .title("QuickPaste Suggestions")
-        .inner_size(420.0, 280.0)
-        .min_inner_size(320.0, 220.0)
+        .inner_size(340.0, 172.0)
+        .min_inner_size(320.0, 152.0)
         .resizable(false)
         .decorations(false)
         .transparent(false)
@@ -109,12 +135,187 @@ fn ensure_suggestion_window(app: &AppHandle) -> Result<tauri::WebviewWindow, Str
         .map_err(|e| e.to_string())
 }
 
-fn position_suggestion_window(win: &tauri::WebviewWindow, app: &AppHandle) {
-    if let Ok(cursor) = app.cursor_position() {
-        let x = (cursor.x + 20.0).max(12.0);
-        let y = (cursor.y + 24.0).max(12.0);
-        let _ = win.set_position(PhysicalPosition::new(x, y));
+#[derive(Clone, Copy, Debug)]
+struct AnchorRect {
+    left: f64,
+    top: f64,
+    right: f64,
+    bottom: f64,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SuggestionPlacement {
+    x: f64,
+    y: f64,
+    height: f64,
+    inverted: bool,
+}
+
+#[cfg(target_os = "windows")]
+fn caret_anchor_rect() -> Option<AnchorRect> {
+    unsafe {
+        let mut info: GUITHREADINFO = std::mem::zeroed();
+        info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
+        if GetGUIThreadInfo(0, &mut info) == 0 || info.hwndCaret.is_null() {
+            return None;
+        }
+
+        let mut top_left = POINT {
+            x: info.rcCaret.left,
+            y: info.rcCaret.top,
+        };
+        let mut bottom_right = POINT {
+            x: info.rcCaret.right,
+            y: info.rcCaret.bottom,
+        };
+        if ClientToScreen(info.hwndCaret, &mut top_left) == 0 {
+            return None;
+        }
+        if ClientToScreen(info.hwndCaret, &mut bottom_right) == 0 {
+            return None;
+        }
+
+        Some(AnchorRect {
+            left: top_left.x as f64,
+            top: top_left.y as f64,
+            right: bottom_right.x as f64,
+            bottom: bottom_right.y as f64,
+        })
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn caret_anchor_rect() -> Option<AnchorRect> {
+    None
+}
+
+fn cursor_anchor_rect(app: &AppHandle) -> Option<AnchorRect> {
+    let cursor = app.cursor_position().ok()?;
+    Some(AnchorRect {
+        left: cursor.x,
+        top: cursor.y,
+        right: cursor.x,
+        bottom: cursor.y,
+    })
+}
+
+fn monitor_bounds_for_anchor(
+    app: &AppHandle,
+    win: &tauri::WebviewWindow,
+    anchor: AnchorRect,
+) -> Option<(f64, f64, f64, f64)> {
+    let monitors = app.available_monitors().ok().unwrap_or_default();
+    let anchor_x = (anchor.left + anchor.right) / 2.0;
+    let anchor_y = (anchor.top + anchor.bottom) / 2.0;
+
+    for monitor in monitors {
+        let pos = monitor.position();
+        let size = monitor.size();
+        let left = pos.x as f64;
+        let top = pos.y as f64;
+        let right = left + size.width as f64;
+        let bottom = top + size.height as f64;
+        if anchor_x >= left && anchor_x <= right && anchor_y >= top && anchor_y <= bottom {
+            return Some((left, top, right, bottom));
+        }
+    }
+
+    let monitor = win
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| app.primary_monitor().ok().flatten());
+
+    monitor.map(|monitor| {
+        let pos = monitor.position();
+        let size = monitor.size();
+        (
+            pos.x as f64,
+            pos.y as f64,
+            pos.x as f64 + size.width as f64,
+            pos.y as f64 + size.height as f64,
+        )
+    })
+}
+
+fn calculate_suggestion_placement(
+    app: &AppHandle,
+    win: &tauri::WebviewWindow,
+    anchor: AnchorRect,
+) -> Option<SuggestionPlacement> {
+    let (screen_left, screen_top, screen_right, screen_bottom) =
+        monitor_bounds_for_anchor(app, win, anchor)?;
+    let screen_mid_y = screen_top + ((screen_bottom - screen_top) / 2.0);
+    let anchor_x = (anchor.left + anchor.right) / 2.0;
+    let anchor_y = (anchor.top + anchor.bottom) / 2.0;
+    let min_x = screen_left + SCREEN_PADDING;
+    let max_x = (screen_right - SUGGESTION_WIDTH - SCREEN_PADDING).max(min_x);
+    let x = (anchor_x - (SUGGESTION_WIDTH / 2.0)).clamp(min_x, max_x);
+
+    if anchor_y >= screen_mid_y {
+        let bottom_limit = anchor.top - SUGGESTION_GAP;
+        let top_limit = screen_mid_y.max(screen_top + SCREEN_PADDING);
+        let available = (bottom_limit - top_limit).max(SUGGESTION_MIN_HEIGHT);
+        let height = available.clamp(SUGGESTION_MIN_HEIGHT, SUGGESTION_MAX_HEIGHT);
+        let y = (bottom_limit - height).max(screen_top + SCREEN_PADDING);
+        return Some(SuggestionPlacement {
+            x,
+            y,
+            height,
+            inverted: true,
+        });
+    }
+
+    let top_limit = anchor.bottom + SUGGESTION_GAP;
+    let upper_zone_limit = screen_top + ((screen_bottom - screen_top) * 0.33);
+    let bottom_limit = if anchor_y <= upper_zone_limit {
+        screen_mid_y
+    } else {
+        screen_bottom - SCREEN_PADDING
+    };
+    let available = (bottom_limit - top_limit).max(SUGGESTION_MIN_HEIGHT);
+    let height = available.clamp(SUGGESTION_MIN_HEIGHT, SUGGESTION_MAX_HEIGHT);
+    Some(SuggestionPlacement {
+        x,
+        y: top_limit.min(screen_bottom - height - SCREEN_PADDING),
+        height,
+        inverted: false,
+    })
+}
+
+fn position_suggestion_window(win: &tauri::WebviewWindow, app: &AppHandle) -> bool {
+    let anchor = caret_anchor_rect().or_else(|| cursor_anchor_rect(app));
+    let Some(anchor) = anchor else {
+        let _ = win.center();
+        return false;
+    };
+
+    let Some(placement) = calculate_suggestion_placement(app, win, anchor) else {
+        let _ = win.center();
+        return false;
+    };
+
+    let _ = win.set_size(PhysicalSize::new(
+        SUGGESTION_WIDTH.round() as u32,
+        placement.height.round() as u32,
+    ));
+    let _ = win.set_position(PhysicalPosition::new(placement.x, placement.y));
+    placement.inverted
+}
+
+fn emit_suggestion_payload(
+    app: &AppHandle,
+    win: &tauri::WebviewWindow,
+    payload: serde_json::Value,
+) {
+    let _ = win.emit("text-expansion-suggestions", payload.clone());
+    let _ = app.emit("text-expansion-suggestions", payload.clone());
+
+    let delayed_window = win.clone();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(60));
+        let _ = delayed_window.emit("text-expansion-suggestions", payload);
+    });
 }
 
 fn hide_suggestion_window() {
@@ -125,7 +326,11 @@ fn hide_suggestion_window() {
     }
 }
 
-fn show_suggestion_window(query: &str, suggestions: Vec<text_expansion::TextExpansionSuggestion>) {
+fn show_suggestion_window(
+    raw_query: &str,
+    normalized_query: &str,
+    suggestions: Vec<text_expansion::TextExpansionSuggestion>,
+) {
     let Some(app) = app_handle() else { return; };
     if suggestions.is_empty() {
         hide_suggestion_window();
@@ -146,17 +351,18 @@ fn show_suggestion_window(query: &str, suggestions: Vec<text_expansion::TextExpa
         }
     };
 
-    position_suggestion_window(&win, app);
+    let inverted = position_suggestion_window(&win, app);
+    let payload = serde_json::json!({
+        "query": raw_query,
+        "normalizedQuery": normalized_query,
+        "deleteGraphemes": raw_query.graphemes(true).count(),
+        "targetWindow": target,
+        "placement": if inverted { "above" } else { "below" },
+        "suggestions": suggestions,
+    });
+
     let _ = win.show();
-    let _ = app.emit(
-        "text-expansion-suggestions",
-        serde_json::json!({
-            "query": query,
-            "deleteGraphemes": query.graphemes(true).count(),
-            "targetWindow": target,
-            "suggestions": suggestions,
-        }),
-    );
+    emit_suggestion_payload(app, &win, payload);
 }
 
 fn perform_trigger_expansion(trigger: &str, delete_graphemes: usize) -> Result<(), String> {
@@ -193,19 +399,24 @@ fn perform_trigger_expansion(trigger: &str, delete_graphemes: usize) -> Result<(
 }
 
 fn refresh_suggestions(buffer: &str) {
-    let query = normalize_query_key(buffer);
-    if query.chars().count() < 2 {
+    let Some(raw_query) = active_suggestion_token(buffer) else {
+        hide_suggestion_window();
+        return;
+    };
+
+    let query = normalize_query_key(&raw_query);
+    if query.chars().count() < 1 {
         hide_suggestion_window();
         return;
     }
 
-    let suggestions = text_expansion::suggest_matches(&query, 6);
+    let suggestions = text_expansion::suggest_matches(&query, 5);
     if suggestions.is_empty() {
         hide_suggestion_window();
         return;
     }
 
-    show_suggestion_window(&query, suggestions);
+    show_suggestion_window(&raw_query, &query, suggestions);
 }
 
 pub fn apply_text_expansion_trigger(trigger: String, delete_graphemes: usize) -> Result<(), String> {

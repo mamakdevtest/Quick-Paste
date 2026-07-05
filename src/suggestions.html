@@ -59,7 +59,7 @@
       background:
         linear-gradient(180deg, rgba(20, 23, 32, 0.98), rgba(12, 14, 20, 0.98));
       border: 1px solid color-mix(in srgb, var(--qp-border) 88%, transparent);
-      border-radius: 20px;
+      border-radius: 14px;
       box-shadow:
         0 24px 70px rgba(0, 0, 0, 0.42),
         inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -67,7 +67,18 @@
       flex-direction: column;
       overflow: hidden;
     }
+    .shell.above {
+      flex-direction: column-reverse;
+    }
+    .search-wrap {
+      border-bottom: 1px solid var(--qp-border);
+    }
+    .shell.above .search-wrap {
+      border-top: 1px solid var(--qp-border);
+      border-bottom: 0;
+    }
     .search {
+      height: 32px;
       background:
         linear-gradient(180deg, color-mix(in srgb, var(--qp-surface) 94%, white 6%), color-mix(in srgb, var(--qp-surface) 88%, black));
       border: 1px solid color-mix(in srgb, var(--qp-border) 88%, transparent);
@@ -83,9 +94,10 @@
     .item {
       border: 1px solid rgba(255,255,255,0.06);
       background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.018));
       transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      min-height: 24px;
     }
     .item:hover {
       transform: translateY(-1px);
@@ -99,6 +111,24 @@
       background: var(--qp-primary-soft);
       border: 1px solid rgba(74, 163, 255, 0.18);
     }
+    .trigger-pill {
+      min-width: 0;
+      max-width: 48%;
+    }
+    .preview-text {
+      min-width: 0;
+      max-width: 52%;
+    }
+    #list::-webkit-scrollbar {
+      width: 8px;
+    }
+    #list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.22);
+      border-radius: 999px;
+    }
+    #list::-webkit-scrollbar-track {
+      background: transparent;
+    }
     .item:active {
       transform: translateY(0);
     }
@@ -108,28 +138,18 @@
     }
     @media (max-width: 360px) {
       .shell {
-        border-radius: 16px;
+        border-radius: 12px;
       }
     }
   </style>
 </head>
 <body>
   <div class="shell">
-    <div class="px-3 pt-3 pb-2 border-b border-[var(--qp-border)]">
-      <div class="text-[10px] uppercase tracking-[0.28em] text-[var(--qp-muted)]">QuickPaste</div>
-      <div class="mt-1 text-sm font-semibold">Suggestions</div>
-      <input id="filterInput" class="search mt-2 w-full rounded-xl px-3 py-2 text-sm" placeholder="Filter suggestions..." />
+    <div id="searchWrap" class="search-wrap px-2.5 pt-2.5 pb-2">
+      <input id="filterInput" class="search w-full rounded-xl px-3 text-sm" placeholder=":fix" />
     </div>
 
-    <div class="px-3 py-2 border-b border-[var(--qp-border)] text-xs text-[var(--qp-muted)]">
-      <span id="queryLabel">Query:</span> <span id="queryValue" class="text-[var(--qp-text)]"></span>
-    </div>
-
-    <div id="list" class="flex-1 overflow-y-auto p-2 flex flex-col gap-2"></div>
-
-    <div class="px-3 py-2 border-t border-[var(--qp-border)] text-[11px] text-[var(--qp-muted)]">
-      Click a suggestion to expand it in the active app.
-    </div>
+    <div id="list" class="flex-1 overflow-y-auto p-1.5 flex flex-col gap-1"></div>
   </div>
 
   <script src="./suggestions.js" type="module"></script>

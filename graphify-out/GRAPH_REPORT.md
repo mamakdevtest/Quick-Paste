@@ -1,16 +1,16 @@
 # Graph Report - insta-paste-tauri  (2026-07-05)
 
 ## Corpus Check
-- 21 files · ~88,389 words
+- 26 files · ~96,997 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 553 nodes · 1080 edges · 49 communities (22 shown, 27 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 6 edges (avg confidence: 0.5)
+- 752 nodes · 1274 edges · 70 communities (43 shown, 27 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 6 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `70ffca45`
+- Built from commit: `5549735e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -61,18 +61,39 @@
 - [[_COMMUNITY_Mutex|Mutex]]
 - [[_COMMUNITY_Mutex|Mutex]]
 - [[_COMMUNITY_WebviewWindow|WebviewWindow]]
+- [[_COMMUNITY_9. Text Expansion Panel|9. Text Expansion Panel]]
+- [[_COMMUNITY_Desktop UIUX Skill|Desktop UI/UX Skill]]
+- [[_COMMUNITY_11. Settings Panel|11. Settings Panel]]
+- [[_COMMUNITY_Snippet Listesi|Snippet Listesi]]
+- [[_COMMUNITY_Form Alanları|Form Alanları]]
+- [[_COMMUNITY_Design System Guardian Skill|Design System Guardian Skill]]
+- [[_COMMUNITY_18. Geliştirilebilir Tasarım Alanları|18. Geliştirilebilir Tasarım Alanları]]
+- [[_COMMUNITY_QuickPaste Agent Instructions|QuickPaste Agent Instructions]]
+- [[_COMMUNITY_Visual UI Review Skill|Visual UI Review Skill]]
+- [[_COMMUNITY_QuickPaste Tasarım Envanteri|QuickPaste Tasarım Envanteri]]
+- [[_COMMUNITY_12. Welcome Window|12. Welcome Window]]
+- [[_COMMUNITY_13. Suggestions Popup|13. Suggestions Popup]]
+- [[_COMMUNITY_10. Dashboard & Stats Panel|10. Dashboard & Stats Panel]]
+- [[_COMMUNITY_6. Command Palette|6. Command Palette]]
+- [[_COMMUNITY_14. Launcher Window|14. Launcher Window]]
+- [[_COMMUNITY_5. Quick Look Overlay|5. Quick Look Overlay]]
+- [[_COMMUNITY_16. Tema ve Görsel Dil|16. Tema ve Görsel Dil]]
+- [[_COMMUNITY_1. Main Window  Ana Shell|1. Main Window / Ana Shell]]
+- [[_COMMUNITY_4. Snippet Context Menu|4. Snippet Context Menu]]
+- [[_COMMUNITY_7. Placeholder Modal|7. Placeholder Modal]]
+- [[_COMMUNITY_8. Toast Notifications|8. Toast Notifications]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `TextExpansion` - 38 edges
-2. `AppState` - 15 edges
-3. `build_default_catalog()` - 14 edges
-4. `⚙️ Uygulamadaki Tüm Sistemler ve Çalışma Prensipleri` - 14 edges
-5. `Snippet` - 13 edges
-6. `reregister_all_shortcuts()` - 12 edges
-7. `load_snippets()` - 11 edges
-8. `load_settings()` - 11 edges
-9. `keyboard_hook_proc()` - 11 edges
-10. `build_seeded_text_expansions()` - 11 edges
+2. `QuickPaste Tasarım Envanteri` - 21 edges
+3. `AppState` - 15 edges
+4. `build_default_catalog()` - 14 edges
+5. `⚙️ Uygulamadaki Tüm Sistemler ve Çalışma Prensipleri` - 14 edges
+6. `Form Alanları` - 13 edges
+7. `Snippet` - 13 edges
+8. `reregister_all_shortcuts()` - 12 edges
+9. `Design System Guardian Skill` - 11 edges
+10. `9. Text Expansion Panel` - 11 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `ImportedData` --references--> `Snippet`  [EXTRACTED]
@@ -89,7 +110,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (49 total, 27 thin omitted)
+## Communities (70 total, 27 thin omitted)
 
 ### Community 0 - "main.js"
 Cohesion: 0.02
@@ -167,20 +188,104 @@ Nodes (5): elements, main(), normalize(), render(), state
 Cohesion: 0.50
 Nodes (4): applyPanelHeaderState(), resizeForSidePanel(), returnToMainPage(), setHeaderButtonActive()
 
+### Community 49 - "9. Text Expansion Panel"
+Cohesion: 0.10
+Nodes (20): 9. Text Expansion Panel, Ana Grid, Application Filter, Conflict Warning, Core Essentials Örnekleri, Default Packs Alanı, Description, Dynamic Variables (+12 more)
+
+### Community 50 - "Desktop UI/UX Skill"
+Cohesion: 0.12
+Nodes (16): Avoid, Command Palette and Menus, Component Guidance, Dark and Light Mode, Desktop Product Principles, Desktop UI/UX Skill, Forms and Dialogs, Header Navigation (+8 more)
+
+### Community 51 - "11. Settings Panel"
+Cohesion: 0.12
+Nodes (17): 11. Settings Panel, About, Accent Color, Appearance, Auto-Clean History, Clipboard, Clipboard History, Danger Zone (+9 more)
+
+### Community 52 - "Snippet Listesi"
+Cohesion: 0.12
+Nodes (17): 2. Ana Sayfa / Snippet Listesi, Bulk Action Bar, Category Filter, Empty State, From Clipboard, İçerik Preview, Kart Aksiyonları, Kart Davranışları (+9 more)
+
+### Community 53 - "Form Alanları"
+Cohesion: 0.12
+Nodes (17): 3. Add/Edit Snippet Dialog, Açıldığı Yerler, Color Label, Content, Emoji, Expansion Trigger, Footer, Form Alanları (+9 more)
+
+### Community 54 - "Design System Guardian Skill"
+Cohesion: 0.17
+Nodes (11): CSS Placement Rules, Design System Guardian Skill, Hard Rules, Naming Rules, Preferred Future Token Structure, Project Context, Required Pre-Implementation Audit, Review Checklist (+3 more)
+
+### Community 55 - "18. Geliştirilebilir Tasarım Alanları"
+Cohesion: 0.18
+Nodes (11): 18. Geliştirilebilir Tasarım Alanları, Ana Sayfa Search Alanı, Dashboard, Default Packs, Header Navigation, Launcher, Settings, Snippet Card (+3 more)
+
+### Community 56 - "QuickPaste Agent Instructions"
+Cohesion: 0.20
+Nodes (9): Design System Rules, General Rules, Interactive Component Requirements, Project Architecture, QuickPaste Agent Instructions, Required Local Skills for UI Work, Responsive Rules, Verification Guidance (+1 more)
+
+### Community 57 - "Visual UI Review Skill"
+Cohesion: 0.20
+Nodes (9): Interaction Review, Preferred Review Workflow, Project Context, Refinement Pass Requirement, Reporting, Required Screen Sizes, Visual Review Criteria, Visual UI Review Skill (+1 more)
+
+### Community 58 - "QuickPaste Tasarım Envanteri"
+Cohesion: 0.20
+Nodes (9): 15. Eski Text Expansion Onboarding Overlay, 17. Tasarım İçin Component Listesi, 19. Tasarım Öncelik Sırası, Ana Pencere İçindeki Paneller, Genel Mimari, İçerik, QuickPaste Tasarım Envanteri, Tasarım Notu (+1 more)
+
+### Community 59 - "12. Welcome Window"
+Cohesion: 0.25
+Nodes (8): 12. Welcome Window, Amaç, Davranış, Header, Sağ Kolon: Available Packs, Sol Kolon: Dynamic Variables, Sol Kolon: Selected Packs, Sol Kolon: Your Profile
+
+### Community 60 - "13. Suggestions Popup"
+Cohesion: 0.25
+Nodes (8): 13. Suggestions Popup, Amaç, Davranış, Footer, Görünüm, Header, Query Row, Suggestion List
+
+### Community 61 - "10. Dashboard & Stats Panel"
+Cohesion: 0.33
+Nodes (6): 10. Dashboard & Stats Panel, 7-Day Activity, Başlık, Metrics Breakdown, Most Used Snippets, Stat Cards
+
+### Community 62 - "6. Command Palette"
+Cohesion: 0.33
+Nodes (6): 6. Command Palette, Davranış, Görünüm, Input, Sistem Komutları, Snippet Arama
+
+### Community 63 - "14. Launcher Window"
+Cohesion: 0.40
+Nodes (5): 14. Launcher Window, Amaç, Launcher Mode Farkları, Pencere Özellikleri, Tasarım Notu
+
+### Community 64 - "5. Quick Look Overlay"
+Cohesion: 0.40
+Nodes (5): 5. Quick Look Overlay, Açıldığı Yerler, Görünüm, İçerik, Secret State
+
+### Community 65 - "16. Tema ve Görsel Dil"
+Cohesion: 0.50
+Nodes (4): 16. Tema ve Görsel Dil, Ana Token'lar, Mevcut Görsel Karakter, Tasarımda Korunması Gerekenler
+
+### Community 66 - "1. Main Window / Ana Shell"
+Cohesion: 0.50
+Nodes (4): 1. Main Window / Ana Shell, Footer, Görsel Yapı, Header
+
+### Community 67 - "4. Snippet Context Menu"
+Cohesion: 0.50
+Nodes (4): 4. Snippet Context Menu, Menü Öğeleri, Tasarım Notu, Transform Submenu
+
+### Community 68 - "7. Placeholder Modal"
+Cohesion: 0.50
+Nodes (4): 7. Placeholder Modal, Davranış, Footer, Görünüm
+
+### Community 69 - "8. Toast Notifications"
+Cohesion: 0.50
+Nodes (4): 8. Toast Notifications, Kullanıldığı Durumlar, Tasarım Notu, Tipler
+
 ## Knowledge Gaps
-- **134 isolated node(s):** `$schema`, `productName`, `version`, `identifier`, `frontendDist` (+129 more)
+- **295 isolated node(s):** `Project Context`, `Required Pre-Implementation Audit`, `Token Rules`, `Preferred Future Token Structure`, `Hard Rules` (+290 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **27 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
+- **Why does `QuickPaste Tasarım Envanteri` connect `QuickPaste Tasarım Envanteri` to `5. Quick Look Overlay`, `16. Tema ve Görsel Dil`, `1. Main Window / Ana Shell`, `4. Snippet Context Menu`, `7. Placeholder Modal`, `8. Toast Notifications`, `9. Text Expansion Panel`, `11. Settings Panel`, `Snippet Listesi`, `Form Alanları`, `18. Geliştirilebilir Tasarım Alanları`, `12. Welcome Window`, `13. Suggestions Popup`, `10. Dashboard & Stats Panel`, `6. Command Palette`, `14. Launcher Window`?**
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Why does `TextExpansion` connect `applyTheme` to `lib.rs`?**
-  _High betweenness centrality (0.038) - this node is a cross-community bridge._
-- **Why does `Snippet` connect `data_store.rs` to `lib.rs`, `applyTheme`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **What connects `$schema`, `productName`, `version` to the rest of the system?**
-  _134 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **What connects `Project Context`, `Required Pre-Implementation Audit`, `Token Rules` to the rest of the system?**
+  _295 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `main.js` be split into smaller, more focused modules?**
   _Cohesion score 0.021739130434782608 - nodes in this community are weakly interconnected._
 - **Should `features.js` be split into smaller, more focused modules?**

@@ -6,16 +6,19 @@ const getCurrentWindow = tauriApi.window?.getCurrentWindow;
 const appWindow = typeof getCurrentWindow === 'function' ? getCurrentWindow() : null;
 
 const elements = {
+  shell: document.querySelector('.shell'),
+  searchWrap: document.getElementById('searchWrap'),
   filterInput: document.getElementById('filterInput'),
-  queryValue: document.getElementById('queryValue'),
   list: document.getElementById('list'),
 };
 
 const state = {
   query: '',
+  normalizedQuery: '',
   deleteGraphemes: 0,
   suggestions: [],
   filter: '',
+  placement: 'below',
 };
 
 function escapeHtml(str) {
@@ -28,11 +31,14 @@ function escapeHtml(str) {
 }
 
 function normalize(value) {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '').trim().replace(/^:+/, '').toLowerCase();
 }
 
 function render() {
-  elements.queryValue.textContent = state.query || '—';
+  if (!elements.list) {
+    return;
+  }
+  elements.shell?.classList.toggle('above', state.placement === 'above');
   const filter = normalize(state.filter);
   const items = state.suggestions.filter((item) => {
     if (!filter) return true;
@@ -43,7 +49,7 @@ function render() {
 
   if (items.length === 0) {
     elements.list.innerHTML = `
-      <div class="rounded-xl border border-dashed border-[var(--qp-border)] px-3 py-4 text-sm text-[var(--qp-muted)]">
+      <div class="rounded-xl border border-dashed border-[var(--qp-border)] px-2.5 py-2 text-[11px] text-[var(--qp-muted)]">
         No matching suggestions.
       </div>
     `;
@@ -53,15 +59,11 @@ function render() {
   elements.list.innerHTML = items.map((item) => `
     <button
       type="button"
-      class="item w-full rounded-xl px-3 py-2 text-left flex flex-col gap-1"
+      class="item w-full rounded-xl px-2 py-1 text-left flex items-center gap-1.5"
       data-trigger="${escapeHtml(item.trigger)}"
     >
-      <div class="flex items-center justify-between gap-3">
-        <span class="font-semibold text-sm text-[var(--qp-primary)]">${escapeHtml(item.trigger)}</span>
-        <span class="text-[10px] uppercase tracking-[0.22em] text-[var(--qp-muted)]">Select</span>
-      </div>
-      <div class="text-xs text-[var(--qp-text)] whitespace-pre-wrap">${escapeHtml(item.replacementPreview || '')}</div>
-      ${item.description ? `<div class="text-[11px] text-[var(--qp-muted)]">${escapeHtml(item.description)}</div>` : ''}
+      <span class="trigger-pill shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-[var(--qp-primary)] bg-[var(--qp-primary-soft)] border border-[rgba(74,163,255,0.18)]">${escapeHtml(item.trigger)}</span>
+      <span class="preview-text text-[11px] text-[var(--qp-text)] opacity-80 truncate">${escapeHtml(item.replacementPreview || item.description || '')}</span>
     </button>
   `).join('');
 
@@ -88,22 +90,24 @@ async function main() {
     await listen('text-expansion-suggestions', (event) => {
       const payload = event?.payload || {};
       state.query = String(payload.query || '');
+      state.normalizedQuery = String(payload.normalizedQuery || '');
       state.deleteGraphemes = Number(payload.deleteGraphemes || 0);
       state.suggestions = Array.isArray(payload.suggestions) ? payload.suggestions : [];
-      state.filter = state.query;
+      state.placement = payload.placement === 'above' ? 'above' : 'below';
+      state.filter = state.normalizedQuery || state.query;
       if (elements.filterInput) {
-        elements.filterInput.value = state.filter;
+        elements.filterInput.value = state.query || state.filter;
       }
       render();
     });
   }
 
-  elements.filterInput.addEventListener('input', () => {
+  elements.filterInput?.addEventListener('input', () => {
     state.filter = elements.filterInput.value;
     render();
   });
 
-  elements.filterInput.addEventListener('keydown', async (event) => {
+  elements.filterInput?.addEventListener('keydown', async (event) => {
     if (event.key === 'Escape') {
       event.preventDefault();
       if (appWindow?.hide) {
@@ -127,7 +131,7 @@ async function main() {
 main().catch((error) => {
   console.error(error);
   elements.list.innerHTML = `
-    <div class="rounded-xl border border-red-500/25 bg-gradient-to-b from-red-500/12 to-red-500/6 px-3 py-4 text-sm text-red-50 shadow-[0_16px_32px_rgba(0,0,0,0.24)]">
+    <div class="rounded-xl border border-red-500/25 bg-gradient-to-b from-red-500/12 to-red-500/6 px-3 py-3 text-xs text-red-50 shadow-[0_16px_32px_rgba(0,0,0,0.24)]">
       Failed to load suggestions.
     </div>
   `;

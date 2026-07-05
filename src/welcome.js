@@ -32,6 +32,11 @@ const WELCOME_I18N = {
     packInstalled: (title, added, skipped) => `${title}: ${added} installed, ${skipped} skipped.`,
     onboardingSaved: 'Welcome setup saved.',
     noPacks: 'No packs selected yet.',
+    allSelectedInstalled: 'Selected defaults are already installed.',
+    installedStatus: 'Installed',
+    partiallyInstalledStatus: 'Partially installed',
+    notInstalledStatus: 'Not installed',
+    installing: 'Installing...',
   },
   tr: {
     title: 'Varsayılan paketleri seçin',
@@ -60,6 +65,11 @@ const WELCOME_I18N = {
     packInstalled: (title, added, skipped) => `${title}: ${added} kuruldu, ${skipped} atlandı.`,
     onboardingSaved: 'Hoş geldiniz ayarı kaydedildi.',
     noPacks: 'Henüz paket seçilmedi.',
+    allSelectedInstalled: 'Seçili varsayılanlar zaten kurulu.',
+    installedStatus: 'Kuruldu',
+    partiallyInstalledStatus: 'Kısmen kurulu',
+    notInstalledStatus: 'Kurulu değil',
+    installing: 'Kuruluyor...',
   },
 };
 
@@ -154,6 +164,10 @@ function normalizeTrigger(trigger) {
   return String(trigger || '').trim().toLowerCase();
 }
 
+function triggerSetFrom(items) {
+  return new Set((items || []).map((item) => normalizeTrigger(item.trigger)).filter(Boolean));
+}
+
 async function main() {
   if (typeof invoke !== 'function') {
     document.body.innerHTML = `
@@ -227,6 +241,7 @@ async function main() {
     variablesDescription: document.getElementById('variablesDescription'),
     packsList: document.getElementById('packsList'),
     installBtn: document.getElementById('installBtn'),
+    installStatus: document.getElementById('installStatus'),
   };
 
   const requiredElementEntries = Object.entries(elements).filter(([, value]) => !value);
@@ -237,6 +252,8 @@ async function main() {
   const state = {
     settings: { ...settings },
     selected: selectedPackIds,
+    expansions,
+    isInstalling: false,
   };
 
   function applyLocale() {
@@ -261,6 +278,7 @@ async function main() {
     elements.variablesTitle.textContent = ui.variablesTitle;
     elements.variablesDescription.textContent = ui.variablesDescription;
     elements.installBtn.textContent = ui.installSelectedDefaults;
+    elements.installStatus.textContent = ui.revisitLater;
   }
 
   function getProfileSnapshot() {
@@ -279,6 +297,14 @@ async function main() {
     const packLabel = locale === 'tr' ? 'paket' : (selectedCount === 1 ? 'pack' : 'packs');
     const snippetLabel = locale === 'tr' ? 'öğe' : (selectedItems === 1 ? 'snippet' : 'snippets');
     elements.selectedSummary.textContent = `${selectedCount} ${packLabel} · ${selectedItems} ${snippetLabel}`;
+    elements.installBtn.disabled = selectedCount === 0 || state.isInstalling;
+    elements.installBtn.setAttribute('aria-disabled', elements.installBtn.disabled ? 'true' : 'false');
+  }
+
+  function setInstallStatus(message, tone = '') {
+    elements.installStatus.textContent = message || ui.revisitLater;
+    elements.installStatus.classList.toggle('success', tone === 'success');
+    elements.installStatus.classList.toggle('info', tone === 'info');
   }
 
   function focusPrimaryInput() {
@@ -294,33 +320,52 @@ async function main() {
 
   function renderPacks() {
     elements.packsList.innerHTML = '';
+    const installedTriggers = triggerSetFrom(state.expansions);
     packs.forEach((pkg) => {
       const selected = state.selected.has(pkg.id);
-      const installedCount = pkg.items.filter((item) => expansions.some((existing) => normalizeTrigger(existing.trigger) === normalizeTrigger(item.trigger))).length;
+      const totalCount = pkg.items.length;
+      const installedCount = pkg.items.filter((item) => installedTriggers.has(normalizeTrigger(item.trigger))).length;
+      const fullyInstalled = totalCount > 0 && installedCount >= totalCount;
+      const partiallyInstalled = installedCount > 0 && !fullyInstalled;
+      const statusLabel = fullyInstalled
+        ? ui.installedStatus
+        : partiallyInstalled
+          ? ui.partiallyInstalledStatus
+          : ui.notInstalledStatus;
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = `pack-card rounded-2xl p-3 text-left flex flex-col gap-2 ${selected ? 'selected' : ''}`;
+      card.className = `pack-card rounded-2xl text-left ${selected ? 'selected' : ''} ${fullyInstalled ? 'installed' : ''}`;
+      card.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      card.setAttribute('aria-label', `${pkg.title} ${statusLabel}`);
+      if (fullyInstalled) {
+        card.disabled = true;
+        card.setAttribute('aria-disabled', 'true');
+      }
       card.innerHTML = `
-        <div class="flex items-start justify-between gap-3">
+        <div class="pack-head">
           <div class="min-w-0">
-            <div class="font-semibold text-sm">${escapeHtml(pkg.title)}</div>
-            <div class="mt-1 text-[11px] text-[var(--qp-muted)]">${escapeHtml(pkg.description || '')}</div>
+            <div class="pack-title">${escapeHtml(pkg.title)}</div>
+            <div class="pack-description">${escapeHtml(pkg.description || '')}</div>
           </div>
-          <label class="pointer-events-none inline-flex items-center gap-2">
-            <input type="checkbox" ${selected ? 'checked' : ''} tabindex="-1">
-          </label>
+          <span class="pack-check" aria-hidden="true">${fullyInstalled || selected ? '✓' : ''}</span>
         </div>
-        <div class="flex items-center justify-between text-[10px] uppercase tracking-[0.25em] text-[var(--qp-muted)]">
-          <span>${escapeHtml(pkg.id)}</span>
-          <span>${installedCount}/${pkg.items.length} ${escapeHtml(ui.installed)}</span>
+        <div class="pack-meta">
+          <span class="pack-chip">${escapeHtml(pkg.id)}</span>
+          <span class="pack-status ${fullyInstalled ? 'complete' : partiallyInstalled ? 'partial' : ''}">
+            ${installedCount}/${totalCount} ${escapeHtml(statusLabel)}
+          </span>
         </div>
       `;
       card.addEventListener('click', () => {
+        if (fullyInstalled || state.isInstalling) {
+          return;
+        }
         if (state.selected.has(pkg.id)) {
           state.selected.delete(pkg.id);
         } else {
           state.selected.add(pkg.id);
         }
+        setInstallStatus(ui.revisitLater);
         renderPacks();
         updateSummary();
       });
@@ -361,16 +406,28 @@ async function main() {
   }
 
   async function installSelectedDefaults() {
+    if (state.isInstalling) {
+      return;
+    }
     const profileSnapshot = getProfileSnapshot();
     const selectedItems = collectSelectedItems();
-    const nextItems = [...expansions];
+    if (selectedItems.length === 0) {
+      setInstallStatus(ui.noPacks, 'info');
+      return;
+    }
+    state.isInstalling = true;
+    elements.installBtn.textContent = ui.installing;
+    setInstallStatus(ui.installing, 'info');
+    updateSummary();
+
+    const nextItems = [...state.expansions];
     let added = 0;
     let skipped = 0;
     const seen = new Set(nextItems.map((item) => normalizeTrigger(item.trigger)));
 
     for (const item of selectedItems) {
       const key = normalizeTrigger(item.trigger);
-      if (seen.has(key)) {
+      if (!key || seen.has(key)) {
         skipped += 1;
         continue;
       }
@@ -379,9 +436,26 @@ async function main() {
       added += 1;
     }
 
-    await invoke('save_text_expansions', { items: nextItems });
-    await saveWelcomeSettings(true);
-    await startMainProgram();
+    try {
+      if (added > 0) {
+        const saved = await invoke('save_text_expansions', { items: nextItems });
+        state.expansions = Array.isArray(saved) ? saved : nextItems;
+      }
+      await saveWelcomeSettings(true);
+      renderPacks();
+      setInstallStatus(
+        added > 0 ? ui.packInstalled(ui.installSelectedDefaults, added, skipped) : ui.allSelectedInstalled,
+        added > 0 ? 'success' : 'info',
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await startMainProgram();
+    } catch (error) {
+      setInstallStatus(String(error), 'info');
+    } finally {
+      state.isInstalling = false;
+      elements.installBtn.textContent = ui.installSelectedDefaults;
+      updateSummary();
+    }
   }
 
   function selectAll() {
@@ -408,6 +482,7 @@ async function main() {
   applyLocale();
   renderPacks();
   focusPrimaryInput();
+  updateSummary();
 
   elements.selectAllBtn.addEventListener('click', selectAll);
   elements.clearSelectionBtn.addEventListener('click', clearSelection);

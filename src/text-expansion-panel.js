@@ -807,14 +807,17 @@ export function setupTextExpansionPanel({
 
   function mergePackageItems(sourceItems, profileName = '') {
     const next = [...expansions];
+    const seen = new Set(next.map((item) => normalizeTrigger(item.trigger)).filter(Boolean));
     let added = 0;
     let skipped = 0;
 
     sourceItems.forEach((item) => {
-      if (triggerExists(item.trigger)) {
+      const key = normalizeTrigger(item.trigger);
+      if (!key || seen.has(key)) {
         skipped += 1;
         return;
       }
+      seen.add(key);
       next.push(buildPackageItem(item, profileName));
       added += 1;
     });

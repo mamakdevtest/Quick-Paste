@@ -44,5 +44,8 @@
   "42": "Snippet",
   "43": "Snippet",
   "44": "String",
-  "45": "Vec"
+  "45": "Vec",
+  "46": "Mutex",
+  "47": "Mutex",
+  "48": "WebviewWindow"
 }
