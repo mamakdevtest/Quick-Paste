@@ -32,16 +32,73 @@
 
     /* ─── Panel sliding ─────────────────────────────────────────────────────── */
     #panelTrack {
-      display: flex; flex-direction: row;
-      width: 400%; height: 100%;
+      display: flex;
+      flex-direction: row;
+      width: 100%;
+      height: 100%;
       transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+      backface-visibility: hidden;
     }
-    #panelTrack.settings-open  { transform: translateX(-25%); }
-    #panelTrack.text-expansion-open { transform: translateX(-50%); }
-    #panelTrack.dashboard-open { transform: translateX(-75%); }
+    #panelTrack.text-expansion-open { transform: translate3d(-100%, 0, 0); }
+    #panelTrack.dashboard-open { transform: translate3d(-200%, 0, 0); }
+    #panelTrack.settings-open  { transform: translate3d(-300%, 0, 0); }
 
     #listPanel, #settingsScroll, #textExpansionScroll, #dashboardScroll {
-      width: 25%; flex-shrink: 0; height: 100%; overflow-y: auto;
+      width: 100%;
+      min-width: 100%;
+      flex-basis: 100%;
+      flex-shrink: 0;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    /* ─── Responsive Panel Layout ───────────────────────────────────────────── */
+    body.qp-compact #textExpansionMainGrid,
+    body.qp-compact #dashboardStatsGrid,
+    body.qp-compact #dialogFieldGrid,
+    body.qp-compact #dialogFooterGrid {
+      grid-template-columns: 1fr !important;
+    }
+
+    body.qp-compact #textExpansionFieldGrid,
+    body.qp-compact #textExpansionToggleGrid,
+    body.qp-compact #textExpansionAppFilterGrid {
+      grid-template-columns: 1fr !important;
+    }
+
+    body.qp-compact #textExpansionHeaderActions,
+    body.qp-compact #textExpansionFormActions,
+    body.qp-compact #searchFrame > .flex.gap-2,
+    body.qp-compact #textExpansionToolbar,
+    body.qp-compact #settingsScroll .flex.items-center.justify-between,
+    body.qp-compact #textExpansionScroll .flex.items-start.justify-between.gap-3 {
+      flex-wrap: wrap;
+    }
+
+    body.qp-compact #textExpansionScroll .qp-switch,
+    body.qp-compact #settingsScroll .qp-switch {
+      flex-shrink: 0;
+    }
+
+    body.qp-narrow #searchFrame > .flex.gap-2,
+    body.qp-narrow #textExpansionToolbar,
+    body.qp-narrow #textExpansionHeaderActions,
+    body.qp-narrow #textExpansionFormActions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    body.qp-narrow #textExpansionHeaderActions > button,
+    body.qp-narrow #textExpansionFormActions > button,
+    body.qp-narrow #searchFrame > .flex.gap-2 > *,
+    body.qp-narrow #textExpansionToolbar > * {
+      width: 100%;
+    }
+
+    body.qp-narrow #headerFrame {
+      padding-left: 10px;
+      padding-right: 10px;
     }
 
     /* ─── Main layout ───────────────────────────────────────────────────────── */
@@ -418,6 +475,10 @@
         class="w-8 h-8 rounded border-2 border-d-primary bg-indigo-900/40 flex items-center justify-content-center justify-center hover:bg-indigo-800/60 transition-colors">
         <span class="material-symbols-outlined fill text-red-400" style="font-size:16px;">push_pin</span>
       </button>
+      <button id="textExpansionBtn" title="Text Expansion"
+        class="w-7 h-7 rounded flex items-center justify-center text-d-dim dark:hover:bg-d-hover hover:text-d-text transition-colors">
+        <span class="material-symbols-outlined" style="font-size:20px;">text_snippet</span>
+      </button>
       <!-- Dashboard button -->
       <button id="dashboardBtn" title="Dashboard & Stats"
         class="w-7 h-7 rounded flex items-center justify-center dark:hover:bg-d-hover transition-colors">
@@ -426,10 +487,6 @@
           <div class="w-1 bg-green-400 rounded-sm"></div>
           <div class="w-1 bg-blue-400 rounded-sm"></div>
         </div>
-      </button>
-      <button id="textExpansionBtn" title="Text Expansion"
-        class="w-7 h-7 rounded flex items-center justify-center text-d-dim dark:hover:bg-d-hover hover:text-d-text transition-colors">
-        <span class="material-symbols-outlined" style="font-size:20px;">text_snippet</span>
       </button>
       <!-- Open Launcher button (Main Window) - disabled/hidden -->
       <button id="openLauncherBtn" title="Quick Launcher (disabled)"
@@ -462,22 +519,22 @@
       <div id="listPanel" class="flex flex-col">
 
         <!-- Search + Category -->
-        <div id="searchFrame" class="px-3 py-2.5 flex flex-col gap-2 border-b dark:border-d-border shrink-0">
+        <div id="searchFrame" class="px-2.5 py-2 flex flex-col gap-1.5 border-b dark:border-d-border shrink-0">
           <div class="flex gap-2">
             <div class="relative flex-1">
               <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-d-dim pointer-events-none" style="font-size:16px;">search</span>
               <input type="text" id="searchInput" placeholder="Search snippets…" autocomplete="off"
-                class="w-full dark:bg-d-input dark:border-d-border dark:text-d-text dark:placeholder-d-dim border rounded-md pl-8 pr-3 py-1.5 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-sans"/>
+                class="w-full dark:bg-d-input dark:border-d-border dark:text-d-text dark:placeholder-d-dim border rounded-md pl-8 pr-2.5 py-1 text-xs focus:outline-none dark:focus:border-d-primary transition-colors font-sans"/>
             </div>
             <select id="categoryFilter"
-              class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-md px-2 py-1.5 text-sm focus:outline-none dark:focus:border-d-primary appearance-none cursor-pointer pr-6 font-sans">
+              class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-md px-2 py-1 text-xs focus:outline-none dark:focus:border-d-primary appearance-none cursor-pointer pr-6 font-sans">
               <option value="All">All</option>
             </select>
           </div>
           <!-- Toolbar -->
           <div class="flex gap-2 text-xs">
             <select id="sortSelect"
-              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-2 py-1 text-xs focus:outline-none appearance-none cursor-pointer font-sans flex-shrink-0">
+              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-2 py-0.75 text-[11px] focus:outline-none appearance-none cursor-pointer font-sans flex-shrink-0">
               <option value="default">📌 Default</option>
               <option value="az">A → Z</option>
               <option value="za">Z → A</option>
@@ -486,12 +543,12 @@
               <option value="oldest">📅 Oldest</option>
             </select>
             <button id="clipboardImportBtn"
-              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-2.5 py-1 flex items-center gap-1 dark:hover:bg-d-hover transition-colors text-xs whitespace-nowrap">
+              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-2 py-0.75 flex items-center gap-1 dark:hover:bg-d-hover transition-colors text-[11px] whitespace-nowrap">
               <span class="material-symbols-outlined text-orange-400" style="font-size:13px;">content_paste</span>
               From Clipboard
             </button>
             <button id="multiSelectBtn"
-              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-2.5 py-1 flex items-center gap-1 dark:hover:bg-d-hover transition-colors text-xs whitespace-nowrap">
+              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-2 py-0.75 flex items-center gap-1 dark:hover:bg-d-hover transition-colors text-[11px] whitespace-nowrap">
               <span class="material-symbols-outlined" style="font-size:13px;">check_box</span>
               Select
             </button>
@@ -524,7 +581,295 @@
         </div>
       </div>
 
-      <!-- ─────────────────────────────────── PANEL 2: SETTINGS -->
+      <!-- ─────────────────────────────────── PANEL 2: TEXT EXPANSION -->
+      <div id="textExpansionScroll" class="dark:bg-d-bg overflow-y-auto">
+        <div class="p-4 flex flex-col gap-4 h-full min-h-0">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p id="textExpansionPanelLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-1">Text Expansion</p>
+              <h3 id="textExpansionPanelTitle" class="text-lg font-bold dark:text-d-text">System-wide snippets</h3>
+              <p id="textExpansionPanelDescription" class="text-xs dark:text-d-dim mt-1 max-w-xl">
+                Type a trigger in any app, then press Space, Enter, Tab, or punctuation to expand it instantly.
+              </p>
+            </div>
+            <div id="textExpansionHeaderActions" class="flex flex-wrap justify-end gap-2">
+              <button id="textExpansionDefaultsBtn"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
+                Defaults
+              </button>
+              <button id="textExpansionImportBtn"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
+                Import
+              </button>
+              <button id="textExpansionExportBtn"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
+                Export
+              </button>
+              <button id="textExpansionBackBtn"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-d-primary text-black hover:opacity-90 transition-opacity">
+                Back
+              </button>
+            </div>
+          </div>
+
+          <div id="textExpansionToolbar" class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-d-dim pointer-events-none" style="font-size:16px;">search</span>
+              <input type="text" id="textExpansionSearchInput" placeholder="Search triggers, replacements, app filters..."
+                autocomplete="off"
+                class="w-full dark:bg-d-input dark:border-d-border dark:text-d-text dark:placeholder-d-dim border rounded-md pl-8 pr-2.5 py-1 text-xs focus:outline-none dark:focus:border-d-primary transition-colors font-sans"/>
+            </div>
+            <button id="textExpansionAddBtn"
+              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-2.5 py-1 flex items-center gap-1 dark:hover:bg-d-hover transition-colors text-[11px] whitespace-nowrap">
+              <span class="material-symbols-outlined" style="font-size:13px;">add</span>
+              New
+            </button>
+          </div>
+
+          <div id="textExpansionMainGrid" class="grid grid-cols-[1.08fr_1fr] gap-4 flex-1 min-h-0">
+            <section class="dark:bg-d-card dark:border-d-border border rounded-xl overflow-hidden flex flex-col min-h-0">
+              <div class="px-3 py-2.5 border-b dark:border-d-border flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">view_list</span>
+                  <span id="textExpansionListTitle" class="font-semibold text-sm dark:text-d-text">Snippet List</span>
+                </div>
+                <span id="textExpansionCount" class="text-[10px] font-semibold dark:text-d-dim uppercase tracking-widest">0 items</span>
+              </div>
+              <div id="textExpansionList" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+                <!-- Rendered by JS -->
+              </div>
+            </section>
+
+            <section class="dark:bg-d-card dark:border-d-border border rounded-xl overflow-hidden flex flex-col min-h-0">
+              <div class="px-3 py-2.5 border-b dark:border-d-border flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">edit</span>
+                  <span id="textExpansionFormTitle" class="font-semibold text-sm dark:text-d-text">New Expansion</span>
+                </div>
+                <div id="textExpansionFormActions" class="flex gap-2">
+                  <button id="textExpansionClearBtn"
+                    class="px-2.5 py-1.5 rounded-md text-[10px] font-semibold dark:bg-d-input dark:border-d-border dark:text-d-dim border dark:hover:bg-d-hover transition-colors">
+                    New
+                  </button>
+                  <button id="textExpansionDeleteBtn"
+                    class="px-2.5 py-1.5 rounded-md text-[10px] font-semibold bg-red-600/80 text-white hover:bg-red-600 transition-colors">
+                    Delete
+                  </button>
+                  <button id="textExpansionSaveBtn"
+                    class="px-3 py-1.5 rounded-md text-[10px] font-semibold bg-d-primary text-black hover:opacity-90 transition-opacity">
+                    Save
+                  </button>
+                </div>
+              </div>
+
+              <div class="p-3 overflow-y-auto flex-1 flex flex-col gap-3">
+                <div id="textExpansionFieldGrid" class="grid grid-cols-2 gap-3">
+                  <div class="flex flex-col gap-1">
+                    <label id="textExpansionTriggerLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Trigger</label>
+                    <input type="text" id="textExpansionTriggerInput" placeholder=":mail"
+                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-mono placeholder:dark:text-d-dim/50"/>
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label id="textExpansionDescriptionLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Description</label>
+                    <input type="text" id="textExpansionDescriptionInput" placeholder="Optional note"
+                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-sans placeholder:dark:text-d-dim/50"/>
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                  <label id="textExpansionReplacementLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Replacement</label>
+                  <textarea id="textExpansionReplacementInput" rows="7" placeholder="Type your replacement here..."
+                    class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none dark:focus:border-d-primary transition-colors resize-none placeholder:dark:text-d-dim/50"></textarea>
+                </div>
+
+                <div id="textExpansionConflictWarning" class="shortcut-warn hidden">
+                  ⚠ Trigger conflict detected. Same trigger cannot be saved twice.
+                </div>
+
+                <div id="textExpansionToggleGrid" class="grid grid-cols-2 gap-3">
+                  <div class="dark:bg-d-input border dark:border-d-border rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-green-400">✓</span>
+                      <span id="textExpansionEnabledLabel" class="font-medium text-sm dark:text-d-text">Enabled</span>
+                    </div>
+                    <label class="qp-switch"><input type="checkbox" id="textExpansionEnabledToggle" checked><span class="qp-slider"></span></label>
+                  </div>
+                  <div class="dark:bg-d-input border dark:border-d-border rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-blue-400">Aa</span>
+                      <span id="textExpansionCaseSensitiveLabel" class="font-medium text-sm dark:text-d-text">Case Sensitive</span>
+                    </div>
+                    <label class="qp-switch"><input type="checkbox" id="textExpansionCaseSensitiveToggle"><span class="qp-slider"></span></label>
+                  </div>
+                </div>
+
+                <div class="dark:bg-d-input border dark:border-d-border rounded-xl px-4 py-3 flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <span class="text-purple-400">↔</span>
+                    <span id="textExpansionWordBoundaryLabel" class="font-medium text-sm dark:text-d-text">Word Boundary</span>
+                  </div>
+                  <label class="qp-switch"><input type="checkbox" id="textExpansionWordBoundaryToggle" checked><span class="qp-slider"></span></label>
+                </div>
+
+                <div class="dark:bg-d-card border dark:border-d-border rounded-xl p-3 flex flex-col gap-3">
+                  <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">apps</span>
+                    <span id="textExpansionAppFilterTitle" class="font-semibold text-sm dark:text-d-text">Application Filter</span>
+                  </div>
+                  <div id="textExpansionAppFilterGrid" class="grid grid-cols-[170px_1fr] gap-2">
+                    <select id="textExpansionAppFilterMode"
+                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary appearance-none cursor-pointer font-sans">
+                      <option value="all">All apps</option>
+                      <option value="unity">Only Unity</option>
+                      <option value="rider">Only Rider</option>
+                      <option value="vscode">Only VS Code</option>
+                      <option value="chrome">Only Chrome</option>
+                      <option value="custom">Custom exe names</option>
+                    </select>
+                    <input type="text" id="textExpansionAppFilterCustom" placeholder="Unity.exe, Rider64.exe, Code.exe"
+                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-mono placeholder:dark:text-d-dim/50"/>
+                  </div>
+                  <div id="textExpansionAppFilterPreview" class="text-[10px] dark:text-d-dim leading-relaxed">
+                    Matches are compared against the active process/exe name.
+                  </div>
+                </div>
+
+                <div class="dark:bg-d-card border dark:border-d-border rounded-xl p-3">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">code</span>
+                    <span id="textExpansionDynamicTitle" class="font-semibold text-sm dark:text-d-text">Dynamic Variables</span>
+                  </div>
+                  <div class="flex flex-wrap gap-2 text-[10px] font-mono">
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{date}}</span>
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{time}}</span>
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{datetime}}</span>
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{clipboard}}</span>
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{uuid}}</span>
+                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{random:1-100}}</span>
+                  </div>
+                  <p id="textExpansionDynamicDescription" class="text-xs dark:text-d-dim mt-2">
+                    Variables resolve when the expansion fires, not when it is saved.
+                  </p>
+                </div>
+
+                <div class="dark:bg-d-card border dark:border-d-border rounded-xl p-3 flex flex-col gap-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">deployed_code</span>
+                        <span id="textExpansionPackagesTitle" class="font-semibold text-sm dark:text-d-text">Unity Game Dev Packs</span>
+                      </div>
+                      <p id="textExpansionPackagesDescription" class="text-xs dark:text-d-dim mt-1">
+                        Install daily-use expansions one by one or add a whole package in one step.
+                      </p>
+                    </div>
+                    <button id="textExpansionInstallAllPackagesBtn"
+                      class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-d-primary text-black hover:opacity-90 transition-opacity whitespace-nowrap">
+                      Install All Packs
+                    </button>
+                  </div>
+                  <div id="textExpansionPackagesList" class="grid grid-cols-1 gap-2">
+                    <!-- Rendered by JS -->
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────────────────────────────── PANEL 3: DASHBOARD -->
+      <div id="dashboardScroll" class="dark:bg-d-bg overflow-y-auto pb-14">
+        <div class="p-4 flex flex-col gap-5">
+
+          <!-- Header -->
+          <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Dashboard &amp; Stats</p>
+
+          <!-- 3 Stat Cards -->
+          <div id="dashboardStatsGrid" class="grid grid-cols-3 gap-2">
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col items-center text-center hover:dark:border-d-primary transition-colors">
+              <span class="text-2xl font-bold text-d-primary" id="statTotalPastes">0</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider dark:text-d-dim mt-1">Total Pastes</span>
+            </div>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col items-center text-center hover:dark:border-d-primary transition-colors">
+              <span class="text-2xl font-bold text-d-primary" id="statTimeSaved">0m</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider dark:text-d-dim mt-1">Time Saved</span>
+            </div>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col items-center text-center hover:dark:border-d-primary transition-colors">
+              <span class="text-2xl font-bold text-d-primary" id="statTotalChars">0</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider dark:text-d-dim mt-1">Chars Copied</span>
+            </div>
+          </div>
+
+          <!-- Most Used -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">🔥 Most Used Snippets</p>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl overflow-hidden">
+              <ul id="statTopSnippetsList" class="divide-y dark:divide-d-border">
+                <!-- Rendered by JS -->
+              </ul>
+            </div>
+          </div>
+
+          <!-- 7-Day Activity -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2 flex items-center gap-1">
+              <span class="material-symbols-outlined text-d-primary" style="font-size:14px;">monitoring</span>
+              7-Day Activity
+            </p>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 h-36 flex items-end gap-2 px-4 pb-2">
+              <div id="statActivityBars" class="flex items-end gap-2 w-full h-full">
+                <!-- Rendered by JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Metrics Breakdown -->
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2 flex items-center gap-1">
+              <span class="material-symbols-outlined text-d-primary" style="font-size:14px;">pie_chart</span>
+              Metrics Breakdown
+            </p>
+            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col gap-3">
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="dark:text-d-text">Text Snippets</span>
+                </div>
+                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
+                  <div id="barTypeText" class="breakdown-bar-fill bg-blue-400" style="width:0%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="dark:text-d-text">Code Snippets</span>
+                </div>
+                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
+                  <div id="barTypeCode" class="breakdown-bar-fill bg-green-400" style="width:0%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="dark:text-d-text">URLs</span>
+                </div>
+                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
+                  <div id="barTypeUrl" class="breakdown-bar-fill bg-purple-400" style="width:0%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="dark:text-d-text">Passwords</span>
+                </div>
+                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
+                  <div id="barTypePassword" class="breakdown-bar-fill bg-orange-400" style="width:0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ─────────────────────────────────── PANEL 4: SETTINGS -->
       <div id="settingsScroll" class="dark:bg-d-bg overflow-y-auto">
         <div class="p-4 flex flex-col gap-5">
 
@@ -553,7 +898,6 @@
           <div>
             <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">Preferences</p>
             <div class="flex flex-col gap-2">
-              <!-- Auto-paste -->
               <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex items-center justify-between">
                 <div>
                   <div class="flex items-center gap-2 mb-0.5">
@@ -564,7 +908,6 @@
                 </div>
                 <label class="qp-switch"><input type="checkbox" id="autoPasteToggle"><span class="qp-slider"></span></label>
               </div>
-              <!-- Startup -->
               <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex items-center justify-between">
                 <div>
                   <div class="flex items-center gap-2 mb-0.5">
@@ -600,7 +943,6 @@
           <div>
             <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">Appearance</p>
             <div class="flex flex-col gap-2">
-              <!-- Dark mode -->
               <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex items-center justify-between">
                 <div>
                   <div class="flex items-center gap-2 mb-0.5">
@@ -611,16 +953,21 @@
                 </div>
                 <label class="qp-switch"><input type="checkbox" id="darkModeToggle"><span class="qp-slider"></span></label>
               </div>
-              <!-- Accent color -->
               <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3">
                 <div class="flex items-center gap-2 mb-1">
                   <span>🎨</span>
                   <span class="font-semibold text-sm dark:text-d-text">Accent Color</span>
                 </div>
                 <p class="text-xs dark:text-d-dim ml-5 mb-2">Choose your preferred accent color.</p>
-                <div class="flex flex-wrap gap-2 ml-5" id="themePickerGrid"></div>
+                <div class="flex flex-wrap gap-2 ml-5 mb-3" id="themePickerGrid"></div>
+                <div class="ml-5 flex items-center gap-3">
+                  <input type="color" id="customAccentInput" value="#7c3aed"
+                    class="h-9 w-12 rounded-lg border dark:border-d-border dark:bg-d-input cursor-pointer p-1"/>
+                  <div class="text-xs dark:text-d-dim">
+                    Pick any accent. QuickPaste will rebuild the full theme around it.
+                  </div>
+                </div>
               </div>
-              <!-- Opacity -->
               <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3">
                 <div class="flex items-center gap-2 mb-2">
                   <span>💧</span>
@@ -706,273 +1053,6 @@
             <div class="font-semibold dark:text-d-text">QuickPaste v0.1.0</div>
             <div>© 2026 Emir Han Mamak · Mamak Studio</div>
             <div class="mt-1 text-[10px] opacity-60">Ctrl+K — Command Palette</div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- ─────────────────────────────────── PANEL 3: TEXT EXPANSION -->
-      <div id="textExpansionScroll" class="dark:bg-d-bg overflow-y-auto">
-        <div class="p-4 flex flex-col gap-4 h-full min-h-0">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <p id="textExpansionPanelLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-1">Text Expansion</p>
-              <h3 id="textExpansionPanelTitle" class="text-lg font-bold dark:text-d-text">System-wide snippets</h3>
-              <p id="textExpansionPanelDescription" class="text-xs dark:text-d-dim mt-1 max-w-xl">
-                Type a trigger in any app, then press Space, Enter, Tab, or punctuation to expand it instantly.
-              </p>
-            </div>
-            <div class="flex flex-wrap justify-end gap-2">
-              <button id="textExpansionDefaultsBtn"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
-                Defaults
-              </button>
-              <button id="textExpansionImportBtn"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
-                Import
-              </button>
-              <button id="textExpansionExportBtn"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold dark:bg-d-input dark:border-d-border dark:text-d-text border dark:hover:bg-d-hover transition-colors">
-                Export
-              </button>
-              <button id="textExpansionBackBtn"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-d-primary text-black hover:opacity-90 transition-opacity">
-                Back
-              </button>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <div class="relative flex-1">
-              <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-d-dim pointer-events-none" style="font-size:16px;">search</span>
-              <input type="text" id="textExpansionSearchInput" placeholder="Search triggers, replacements, app filters..."
-                autocomplete="off"
-                class="w-full dark:bg-d-input dark:border-d-border dark:text-d-text dark:placeholder-d-dim border rounded-md pl-8 pr-3 py-1.5 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-sans"/>
-            </div>
-            <button id="textExpansionAddBtn"
-              class="dark:bg-d-input dark:border-d-border dark:text-d-dim border rounded-md px-3 py-1.5 flex items-center gap-1 dark:hover:bg-d-hover transition-colors text-xs whitespace-nowrap">
-              <span class="material-symbols-outlined" style="font-size:14px;">add</span>
-              New
-            </button>
-          </div>
-
-          <div class="grid grid-cols-[1.08fr_1fr] gap-4 flex-1 min-h-0">
-            <section class="dark:bg-d-card dark:border-d-border border rounded-xl overflow-hidden flex flex-col min-h-0">
-              <div class="px-3 py-2.5 border-b dark:border-d-border flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">view_list</span>
-                  <span id="textExpansionListTitle" class="font-semibold text-sm dark:text-d-text">Snippet List</span>
-                </div>
-                <span id="textExpansionCount" class="text-[10px] font-semibold dark:text-d-dim uppercase tracking-widest">0 items</span>
-              </div>
-              <div id="textExpansionList" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
-                <!-- Rendered by JS -->
-              </div>
-            </section>
-
-            <section class="dark:bg-d-card dark:border-d-border border rounded-xl overflow-hidden flex flex-col min-h-0">
-              <div class="px-3 py-2.5 border-b dark:border-d-border flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">edit</span>
-                  <span id="textExpansionFormTitle" class="font-semibold text-sm dark:text-d-text">New Expansion</span>
-                </div>
-                <div class="flex gap-2">
-                  <button id="textExpansionClearBtn"
-                    class="px-2.5 py-1.5 rounded-md text-[10px] font-semibold dark:bg-d-input dark:border-d-border dark:text-d-dim border dark:hover:bg-d-hover transition-colors">
-                    New
-                  </button>
-                  <button id="textExpansionDeleteBtn"
-                    class="px-2.5 py-1.5 rounded-md text-[10px] font-semibold bg-red-600/80 text-white hover:bg-red-600 transition-colors">
-                    Delete
-                  </button>
-                  <button id="textExpansionSaveBtn"
-                    class="px-3 py-1.5 rounded-md text-[10px] font-semibold bg-d-primary text-black hover:opacity-90 transition-opacity">
-                    Save
-                  </button>
-                </div>
-              </div>
-
-              <div class="p-3 overflow-y-auto flex-1 flex flex-col gap-3">
-                <div class="grid grid-cols-2 gap-3">
-                  <div class="flex flex-col gap-1">
-                    <label id="textExpansionTriggerLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Trigger</label>
-                    <input type="text" id="textExpansionTriggerInput" placeholder=":mail"
-                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-mono placeholder:dark:text-d-dim/50"/>
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <label id="textExpansionDescriptionLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Description</label>
-                    <input type="text" id="textExpansionDescriptionInput" placeholder="Optional note"
-                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-sans placeholder:dark:text-d-dim/50"/>
-                  </div>
-                </div>
-
-                <div class="flex flex-col gap-1">
-                  <label id="textExpansionReplacementLabel" class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Replacement</label>
-                  <textarea id="textExpansionReplacementInput" rows="7" placeholder="Type your replacement here..."
-                    class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none dark:focus:border-d-primary transition-colors resize-none placeholder:dark:text-d-dim/50"></textarea>
-                </div>
-
-                <div id="textExpansionConflictWarning" class="shortcut-warn hidden">
-                  ⚠ Trigger conflict detected. Same trigger cannot be saved twice.
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                  <div class="dark:bg-d-input border dark:border-d-border rounded-xl px-4 py-3 flex items-center justify-between">
-                    <div class="flex items-center gap-2.5">
-                      <span class="text-green-400">✓</span>
-                      <span id="textExpansionEnabledLabel" class="font-medium text-sm dark:text-d-text">Enabled</span>
-                    </div>
-                    <label class="qp-switch"><input type="checkbox" id="textExpansionEnabledToggle" checked><span class="qp-slider"></span></label>
-                  </div>
-                  <div class="dark:bg-d-input border dark:border-d-border rounded-xl px-4 py-3 flex items-center justify-between">
-                    <div class="flex items-center gap-2.5">
-                      <span class="text-blue-400">Aa</span>
-                      <span id="textExpansionCaseSensitiveLabel" class="font-medium text-sm dark:text-d-text">Case Sensitive</span>
-                    </div>
-                    <label class="qp-switch"><input type="checkbox" id="textExpansionCaseSensitiveToggle"><span class="qp-slider"></span></label>
-                  </div>
-                </div>
-
-                <div class="dark:bg-d-input border dark:border-d-border rounded-xl px-4 py-3 flex items-center justify-between">
-                  <div class="flex items-center gap-2.5">
-                    <span class="text-purple-400">↔</span>
-                    <span id="textExpansionWordBoundaryLabel" class="font-medium text-sm dark:text-d-text">Word Boundary</span>
-                  </div>
-                  <label class="qp-switch"><input type="checkbox" id="textExpansionWordBoundaryToggle" checked><span class="qp-slider"></span></label>
-                </div>
-
-                <div class="dark:bg-d-card border dark:border-d-border rounded-xl p-3 flex flex-col gap-3">
-                  <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">apps</span>
-                    <span id="textExpansionAppFilterTitle" class="font-semibold text-sm dark:text-d-text">Application Filter</span>
-                  </div>
-                  <div class="grid grid-cols-[170px_1fr] gap-2">
-                    <select id="textExpansionAppFilterMode"
-                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary appearance-none cursor-pointer font-sans">
-                      <option value="all">All apps</option>
-                      <option value="unity">Only Unity</option>
-                      <option value="rider">Only Rider</option>
-                      <option value="vscode">Only VS Code</option>
-                      <option value="chrome">Only Chrome</option>
-                      <option value="custom">Custom exe names</option>
-                    </select>
-                    <input type="text" id="textExpansionAppFilterCustom" placeholder="Unity.exe, Rider64.exe, Code.exe"
-                      class="dark:bg-d-input dark:border-d-border dark:text-d-text border rounded-lg px-3 py-2 text-sm focus:outline-none dark:focus:border-d-primary transition-colors font-mono placeholder:dark:text-d-dim/50"/>
-                  </div>
-                  <div id="textExpansionAppFilterPreview" class="text-[10px] dark:text-d-dim leading-relaxed">
-                    Matches are compared against the active process/exe name.
-                  </div>
-                </div>
-
-                <div class="dark:bg-d-card border dark:border-d-border rounded-xl p-3">
-                  <div class="flex items-center gap-2 mb-2">
-                    <span class="material-symbols-outlined text-d-primary" style="font-size:18px;">code</span>
-                    <span id="textExpansionDynamicTitle" class="font-semibold text-sm dark:text-d-text">Dynamic Variables</span>
-                  </div>
-                  <div class="flex flex-wrap gap-2 text-[10px] font-mono">
-                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{date}}</span>
-                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{time}}</span>
-                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{datetime}}</span>
-                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{clipboard}}</span>
-                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{uuid}}</span>
-                    <span class="px-2 py-1 rounded bg-black/15 dark:bg-black/30">{{random:1-100}}</span>
-                  </div>
-                  <p id="textExpansionDynamicDescription" class="text-xs dark:text-d-dim mt-2">
-                    Variables resolve when the expansion fires, not when it is saved.
-                  </p>
-                </div>
-              </div>
-            </section>
-          </div>
-        </div>
-      </div>
-
-      <!-- ─────────────────────────────────── PANEL 3: DASHBOARD -->
-      <div id="dashboardScroll" class="dark:bg-d-bg overflow-y-auto pb-14">
-        <div class="p-4 flex flex-col gap-5">
-
-          <!-- Header -->
-          <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim">Dashboard &amp; Stats</p>
-
-          <!-- 3 Stat Cards -->
-          <div class="grid grid-cols-3 gap-2">
-            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col items-center text-center hover:dark:border-d-primary transition-colors">
-              <span class="text-2xl font-bold text-d-primary" id="statTotalPastes">0</span>
-              <span class="text-[10px] font-bold uppercase tracking-wider dark:text-d-dim mt-1">Total Pastes</span>
-            </div>
-            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col items-center text-center hover:dark:border-d-primary transition-colors">
-              <span class="text-2xl font-bold text-d-primary" id="statTimeSaved">0m</span>
-              <span class="text-[10px] font-bold uppercase tracking-wider dark:text-d-dim mt-1">Time Saved</span>
-            </div>
-            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col items-center text-center hover:dark:border-d-primary transition-colors">
-              <span class="text-2xl font-bold text-d-primary" id="statTotalChars">0</span>
-              <span class="text-[10px] font-bold uppercase tracking-wider dark:text-d-dim mt-1">Chars Copied</span>
-            </div>
-          </div>
-
-          <!-- Most Used -->
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2">🔥 Most Used Snippets</p>
-            <div class="dark:bg-d-card dark:border-d-border border rounded-xl overflow-hidden">
-              <ul id="statTopSnippetsList" class="divide-y dark:divide-d-border">
-                <!-- Rendered by JS -->
-              </ul>
-            </div>
-          </div>
-
-          <!-- 7-Day Activity -->
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2 flex items-center gap-1">
-              <span class="material-symbols-outlined text-d-primary" style="font-size:14px;">monitoring</span>
-              7-Day Activity
-            </p>
-            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 h-36 flex items-end gap-2 px-4 pb-2">
-              <div id="statActivityBars" class="flex items-end gap-2 w-full h-full">
-                <!-- Rendered by JS -->
-              </div>
-            </div>
-          </div>
-
-          <!-- Metrics Breakdown -->
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-widest dark:text-d-dim mb-2 flex items-center gap-1">
-              <span class="material-symbols-outlined text-d-primary" style="font-size:14px;">pie_chart</span>
-              Metrics Breakdown
-            </p>
-            <div class="dark:bg-d-card dark:border-d-border border rounded-xl p-3 flex flex-col gap-3">
-              <div>
-                <div class="flex justify-between text-xs mb-1">
-                  <span class="dark:text-d-text">Text Snippets</span>
-                </div>
-                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
-                  <div id="barTypeText" class="breakdown-bar-fill bg-blue-400" style="width:0%"></div>
-                </div>
-              </div>
-              <div>
-                <div class="flex justify-between text-xs mb-1">
-                  <span class="dark:text-d-text">Code Snippets</span>
-                </div>
-                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
-                  <div id="barTypeCode" class="breakdown-bar-fill bg-green-400" style="width:0%"></div>
-                </div>
-              </div>
-              <div>
-                <div class="flex justify-between text-xs mb-1">
-                  <span class="dark:text-d-text">URLs</span>
-                </div>
-                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
-                  <div id="barTypeUrl" class="breakdown-bar-fill bg-purple-400" style="width:0%"></div>
-                </div>
-              </div>
-              <div>
-                <div class="flex justify-between text-xs mb-1">
-                  <span class="dark:text-d-text">Passwords</span>
-                </div>
-                <div class="h-1.5 dark:bg-d-input rounded-full overflow-hidden">
-                  <div id="barTypePassword" class="breakdown-bar-fill bg-orange-400" style="width:0%"></div>
-                </div>
-              </div>
-            </div>
           </div>
 
         </div>

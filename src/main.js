@@ -8,7 +8,7 @@ import {
   smartDedup,
   checkAutoPromote,
   sortByContext,
-  THEMES, applyTheme,
+  THEMES, applyTheme, resolveTheme,
   showQuickLook,
   openCommandPalette, closeCommandPalette, isCommandPaletteOpen,
   executeChain,
@@ -68,6 +68,51 @@ const bulkDeleteBtn   = document.getElementById('bulkDeleteBtn');
 const bulkCancelBtn   = document.getElementById('bulkCancelBtn');
 const openLauncherBtn = document.getElementById('openLauncherBtn');
 const openSettingsBtn = document.getElementById('openSettingsBtn');
+const dashboardBtn    = document.getElementById('dashboardBtn');
+
+const DASHBOARD_ICON_HTML = `<div class="flex gap-0.5 h-3.5"><div class="w-1 bg-pink-500 rounded-sm"></div><div class="w-1 bg-green-400 rounded-sm"></div><div class="w-1 bg-blue-400 rounded-sm"></div></div>`;
+const SETTINGS_ICON_HTML = '<span class="material-symbols-outlined" style="font-size:20px;">settings</span>';
+const BACK_ICON_HTML = '<span class="material-symbols-outlined" style="font-size:20px;">arrow_back</span>';
+
+function setHeaderButtonActive(button, active) {
+  if (!button) {
+    return;
+  }
+  button.classList.toggle('text-d-primary', active);
+  button.classList.toggle('bg-d-primary/15', active);
+  button.classList.toggle('text-d-dim', !active);
+}
+
+function applyPanelHeaderState(panel) {
+  settingsOpen = panel === 'settings';
+  dashboardOpen = panel === 'dashboard';
+
+  panelTrack.classList.remove('settings-open', 'dashboard-open');
+  if (panel === 'settings') {
+    panelTrack.classList.add('settings-open');
+  } else if (panel === 'dashboard') {
+    panelTrack.classList.add('dashboard-open');
+  }
+
+  setHeaderButtonActive(settingsBtn, settingsOpen);
+  setHeaderButtonActive(dashboardBtn, dashboardOpen);
+  settingsBtn.innerHTML = settingsOpen ? BACK_ICON_HTML : SETTINGS_ICON_HTML;
+  dashboardBtn.innerHTML = dashboardOpen ? BACK_ICON_HTML : DASHBOARD_ICON_HTML;
+}
+
+function resizeForSidePanel(isOpen) {
+  if (appWindow.label !== 'main') {
+    return;
+  }
+  const width = isOpen ? WIN_PANEL_WIDTH : WIN_BASE_WIDTH;
+  appWindow.setSize({ type: 'Logical', width, height: WIN_BASE_HEIGHT }).catch(() => {});
+}
+
+function applyResponsiveLayoutMode() {
+  const width = window.innerWidth || document.documentElement.clientWidth || WIN_BASE_WIDTH;
+  document.body.classList.toggle('qp-compact', width <= 900);
+  document.body.classList.toggle('qp-narrow', width <= 640);
+}
 
 // Settings UI
 const autoPasteToggle        = document.getElementById('autoPasteToggle');
@@ -83,6 +128,7 @@ const hotkeyInput            = document.getElementById('hotkeyInput');
 const hotkeyClearBtn         = document.getElementById('hotkeyClearBtn');
 const opacitySlider          = document.getElementById('opacitySlider');
 const opacityLabel           = document.getElementById('opacityLabel');
+const customAccentInput      = document.getElementById('customAccentInput');
 
 // Dialog
 const dialogOverlay           = document.getElementById('dialogOverlay');
@@ -123,6 +169,8 @@ function showToast(msg, duration = 1600, type = 'success') {
 // ─── Initialize ────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   const windowLabel = appWindow.label;
+  applyResponsiveLayoutMode();
+  window.addEventListener('resize', applyResponsiveLayoutMode);
   
   if (windowLabel === 'launcher') {
     document.body.classList.add('launcher-mode');
@@ -141,6 +189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   appSettings = await invoke('load_settings');
+  setupThemePicker();
   applySettings(appSettings);
 
   textExpansionPanel = setupTextExpansionPanel({
@@ -153,17 +202,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     windowExpansionWidth: WIN_TEXT_EXPANSION_WIDTH,
     windowHeight: WIN_BASE_HEIGHT,
   });
+  applyPanelHeaderState(null);
 
   window.addEventListener('text-expansion-opened', () => {
-    panelTrack.classList.remove('settings-open', 'dashboard-open');
-    if (settingsOpen) {
-      settingsOpen = false;
-      settingsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">settings</span>';
-    }
-    if (dashboardOpen) {
-      dashboardOpen = false;
-      dashboardBtn.innerHTML = `<div class="flex gap-0.5 h-3.5"><div class="w-1 bg-pink-500 rounded-sm"></div><div class="w-1 bg-green-400 rounded-sm"></div><div class="w-1 bg-blue-400 rounded-sm"></div></div>`;
-    }
+    applyPanelHeaderState(null);
   });
 
   await reloadData();
@@ -212,7 +254,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupShortcutCapture();
   setupHotkeyCapture();
   setupColorPicker();
-  setupThemePicker();
 });
 
 // ─── Settings ──────────────────────────────────────────────────────────────────
@@ -232,6 +273,10 @@ function applySettings(settings) {
   const themeId = settings.theme || 'violet';
   currentThemeId = themeId;
   applyTheme(themeId, !!settings.dark_mode);
+  const resolvedTheme = resolveTheme(themeId);
+  if (customAccentInput) {
+    customAccentInput.value = resolvedTheme.accent || '#7c3aed';
+  }
   document.querySelectorAll('.theme-dot-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.theme === themeId);
   });
@@ -934,16 +979,14 @@ window.addEventListener('keydown', async e => {
     if (!dialogOverlay.classList.contains('hidden')) { closeDialog(); return; }
     if (multiSelectMode) { bulkCancelBtn.click(); return; }
     if (settingsOpen) {
-      settingsOpen = false;
-      panelTrack.classList.remove('settings-open');
-      settingsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">settings</span>';
+      applyPanelHeaderState(null);
+      resizeForSidePanel(false);
       setTimeout(() => searchInput.focus(), 280);
       return;
     }
     if (dashboardOpen) {
-      dashboardOpen = false;
-      panelTrack.classList.remove('dashboard-open');
-      dashboardBtn.innerHTML = `<div class="flex gap-0.5 h-3.5"><div class="w-1 bg-pink-500 rounded-sm"></div><div class="w-1 bg-green-400 rounded-sm"></div><div class="w-1 bg-blue-400 rounded-sm"></div></div>`;
+      applyPanelHeaderState(null);
+      resizeForSidePanel(false);
       setTimeout(() => searchInput.focus(), 280);
       return;
     }
@@ -1319,6 +1362,62 @@ function updateColorPicker(selectedColor) {
   document.querySelectorAll('.color-dot-btn').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.color === selectedColor);
   });
+}
+
+// ─── Theme Picker ─────────────────────────────────────────────────────────────
+function setupThemePicker() {
+  const themePickerGrid = document.getElementById('themePickerGrid');
+  if (!themePickerGrid) {
+    return;
+  }
+
+  themePickerGrid.innerHTML = '';
+
+  THEMES.forEach((theme) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'theme-dot-btn';
+    btn.dataset.theme = theme.id;
+    btn.title = `${theme.name} (${theme.accent})`;
+    btn.innerHTML = `
+      <span class="theme-dot-inner" style="background:${theme.accent}; color:#fff;">
+        ${theme.emoji || ''}
+      </span>
+    `;
+    btn.addEventListener('click', async () => {
+      currentThemeId = theme.id;
+      if (customAccentInput) {
+        customAccentInput.value = theme.accent;
+      }
+      applyTheme(currentThemeId, !!appSettings.dark_mode);
+      document.querySelectorAll('.theme-dot-btn').forEach((item) => {
+        item.classList.toggle('active', item.dataset.theme === currentThemeId);
+      });
+      await saveCurrentSettings();
+      showToast(`Theme updated: ${theme.name}`, 1400, 'success');
+    });
+    themePickerGrid.appendChild(btn);
+  });
+
+  if (customAccentInput) {
+    customAccentInput.addEventListener('input', () => {
+      currentThemeId = `custom:${customAccentInput.value.toLowerCase()}`;
+      applyTheme(currentThemeId, !!appSettings.dark_mode);
+      document.querySelectorAll('.theme-dot-btn').forEach((item) => {
+        item.classList.remove('active');
+      });
+    });
+
+    customAccentInput.addEventListener('change', async () => {
+      currentThemeId = `custom:${customAccentInput.value.toLowerCase()}`;
+      applyTheme(currentThemeId, !!appSettings.dark_mode);
+      document.querySelectorAll('.theme-dot-btn').forEach((item) => {
+        item.classList.remove('active');
+      });
+      await saveCurrentSettings();
+      showToast(`Accent updated: ${customAccentInput.value.toUpperCase()}`, 1400, 'success');
+    });
+  }
 }
 
 // ─── Context Menu ─────────────────────────────────────────────────────────────
@@ -1796,36 +1895,19 @@ function updateDashboardStats() {
 }
 
 // ─── Dashboard Transition ────────────────────────────────────────────────────────
-const dashboardBtn = document.getElementById('dashboardBtn');
-
 dashboardBtn.addEventListener('click', () => {
   if (textExpansionPanel?.isOpen()) {
     textExpansionPanel.closePanel();
   }
-  dashboardOpen = !dashboardOpen;
-  
-  if (dashboardOpen) {
-    settingsOpen = false;
-    panelTrack.classList.remove('settings-open');
-    settingsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">settings</span>';
-    
-    panelTrack.classList.add('dashboard-open');
-    dashboardBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">arrow_back</span>';
-    
-    // Expand window for dashboard panel (only in main mode)
-    if (appWindow.label === 'main') {
-      appWindow.setSize({ type: 'Logical', width: WIN_PANEL_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
-    }
-    
+  const nextOpen = !dashboardOpen;
+
+  if (nextOpen) {
+    applyPanelHeaderState('dashboard');
+    resizeForSidePanel(true);
     updateDashboardStats();
   } else {
-    panelTrack.classList.remove('dashboard-open');
-    dashboardBtn.innerHTML = `<div class="flex gap-0.5 h-3.5"><div class="w-1 bg-pink-500 rounded-sm"></div><div class="w-1 bg-green-400 rounded-sm"></div><div class="w-1 bg-blue-400 rounded-sm"></div></div>`;
-    
-    // Restore window to base size (only in main mode)
-    if (appWindow.label === 'main') {
-      appWindow.setSize({ type: 'Logical', width: WIN_BASE_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
-    }
+    applyPanelHeaderState(null);
+    resizeForSidePanel(false);
     setTimeout(() => searchInput.focus(), 280);
   }
 });
@@ -1835,28 +1917,14 @@ settingsBtn.addEventListener('click', () => {
   if (textExpansionPanel?.isOpen()) {
     textExpansionPanel.closePanel();
   }
-  settingsOpen = !settingsOpen;
-  
-  if (settingsOpen) {
-    dashboardOpen = false;
-    panelTrack.classList.remove('dashboard-open');
-    dashboardBtn.innerHTML = `<div class="flex gap-0.5 h-3.5"><div class="w-1 bg-pink-500 rounded-sm"></div><div class="w-1 bg-green-400 rounded-sm"></div><div class="w-1 bg-blue-400 rounded-sm"></div></div>`;
-    
-    panelTrack.classList.add('settings-open');
-    settingsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">arrow_back</span>';
-    
-    // Expand window for settings panel (only in main mode)
-    if (appWindow.label === 'main') {
-      appWindow.setSize({ type: 'Logical', width: WIN_PANEL_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
-    }
+  const nextOpen = !settingsOpen;
+
+  if (nextOpen) {
+    applyPanelHeaderState('settings');
+    resizeForSidePanel(true);
   } else {
-    panelTrack.classList.remove('settings-open');
-    settingsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">settings</span>';
-    
-    // Restore window to base size (only in main mode)
-    if (appWindow.label === 'main') {
-      appWindow.setSize({ type: 'Logical', width: WIN_BASE_WIDTH, height: WIN_BASE_HEIGHT }).catch(() => {});
-    }
+    applyPanelHeaderState(null);
+    resizeForSidePanel(false);
     setTimeout(() => searchInput.focus(), 280);
   }
 });

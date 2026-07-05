@@ -51,8 +51,14 @@ pub struct Settings {
     pub clipboard_history_enabled: bool,
     pub startup_with_os: bool,
     pub hotkey: String,
+    #[serde(default = "default_theme")]
+    pub theme: String,
     #[serde(default = "default_history_days")]
     pub clipboard_history_duration_days: u32,
+}
+
+fn default_theme() -> String {
+    "violet".to_string()
 }
 
 fn default_history_days() -> u32 {
@@ -67,6 +73,7 @@ impl Default for Settings {
             clipboard_history_enabled: false,
             startup_with_os: false,
             hotkey: "alt+q".to_string(),
+            theme: default_theme(),
             clipboard_history_duration_days: 30,
         }
     }
@@ -252,9 +259,11 @@ mod tests {
 
         let mut s = Settings::default();
         s.dark_mode = true;
+        s.theme = "custom:#112233".to_string();
         save_settings(&s);
         let loaded = load_settings();
         assert_eq!(loaded.dark_mode, true);
+        assert_eq!(loaded.theme, "custom:#112233");
 
         let _ = fs::remove_dir_all(get_app_dir());
         env::remove_var("QUICKPASTE_APP_DIR");

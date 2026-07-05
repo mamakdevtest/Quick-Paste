@@ -501,8 +501,88 @@ export const THEMES = [
   },
 ];
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function expandHex(hex) {
+  const clean = String(hex || '').trim().replace(/^#/, '');
+  if (clean.length === 3) {
+    return clean.split('').map((char) => char + char).join('');
+  }
+  return clean;
+}
+
+function hexToRgb(hex) {
+  const expanded = expandHex(hex);
+  if (!/^[0-9a-fA-F]{6}$/.test(expanded)) {
+    return null;
+  }
+  return {
+    r: parseInt(expanded.slice(0, 2), 16),
+    g: parseInt(expanded.slice(2, 4), 16),
+    b: parseInt(expanded.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  const toHex = (value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function mixHex(hex, targetHex, amount) {
+  const start = hexToRgb(hex);
+  const target = hexToRgb(targetHex);
+  if (!start || !target) {
+    return hex;
+  }
+  return rgbToHex({
+    r: start.r + (target.r - start.r) * amount,
+    g: start.g + (target.g - start.g) * amount,
+    b: start.b + (target.b - start.b) * amount,
+  });
+}
+
+function rgba(hex, alpha) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) {
+    return `rgba(124,58,237,${alpha})`;
+  }
+  return `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
+}
+
+function buildCustomTheme(accentHex) {
+  const accent = rgbToHex(hexToRgb(accentHex) || { r: 124, g: 58, b: 237 });
+  return {
+    id: `custom:${accent.toLowerCase()}`,
+    name: 'Custom',
+    accent,
+    emoji: '🎯',
+    vars: {
+      '--primary': mixHex(accent, '#000000', 0.18),
+      '--primary-container': accent,
+      '--primary-fixed': mixHex(accent, '#ffffff', 0.82),
+      '--card-hover': rgba(accent, 0.08),
+    },
+    darkVars: {
+      '--primary': mixHex(accent, '#ffffff', 0.28),
+      '--primary-container': mixHex(accent, '#000000', 0.32),
+      '--primary-fixed': mixHex(accent, '#000000', 0.7),
+      '--card-hover': rgba(accent, 0.12),
+    }
+  };
+}
+
+export function resolveTheme(themeId) {
+  if (String(themeId || '').startsWith('custom:')) {
+    const accent = String(themeId).slice('custom:'.length) || '#7c3aed';
+    return buildCustomTheme(accent);
+  }
+  return THEMES.find(t => t.id === themeId) || THEMES[0];
+}
+
 export function applyTheme(themeId, isDark) {
-  const theme = THEMES.find(t => t.id === themeId) || THEMES[0];
+  const theme = resolveTheme(themeId);
   const vars = isDark ? { ...theme.vars, ...theme.darkVars } : theme.vars;
   const root = document.documentElement;
   for (const [key, val] of Object.entries(vars)) {
@@ -519,6 +599,9 @@ export function resetThemeVars() {
       root.style.removeProperty(key);
     }
   }
+  ['--primary', '--primary-container', '--primary-fixed', '--card-hover'].forEach((key) => {
+    root.style.removeProperty(key);
+  });
 }
 
 // ─── Quick Look Preview ───────────────────────────────────────────────────────

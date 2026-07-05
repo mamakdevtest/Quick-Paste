@@ -6,6 +6,41 @@ const APP_FILTER_PRESETS = {
   chrome: ['chrome.exe'],
 };
 
+const UNITY_PACKAGES = [
+  {
+    id: 'unity-debug',
+    title: 'Unity Debug',
+    description: 'Fast logging and test snippets for the Unity Editor and play mode.',
+    items: [
+      { trigger: ':ulog', replacement: 'Debug.Log("");', description: 'Unity Debug.Log', appFilter: ['unity.exe'], wordBoundary: true },
+      { trigger: ':uwarn', replacement: 'Debug.LogWarning("");', description: 'Unity warning log', appFilter: ['unity.exe'], wordBoundary: true },
+      { trigger: ':uerr', replacement: 'Debug.LogError("");', description: 'Unity error log', appFilter: ['unity.exe'], wordBoundary: true },
+      { trigger: ':todou', replacement: '// TODO: ', description: 'Unity TODO comment', appFilter: ['rider64.exe', 'rider.exe', 'code.exe'], wordBoundary: true },
+    ],
+  },
+  {
+    id: 'unity-bug-report',
+    title: 'Bug Report',
+    description: 'Daily QA and reproduction templates for game-dev bug tracking.',
+    items: [
+      { trigger: ':ubug', replacement: 'Başlık:\nBuild:\nSahne:\nAdımlar:\nBeklenen Sonuç:\nGerçek Sonuç:\nNotlar:', description: 'Unity bug report template', appFilter: [], wordBoundary: true },
+      { trigger: ':utest', replacement: 'Test Ortamı:\nPlatform:\nSonuç:\nNotlar:', description: 'Quick test result template', appFilter: [], wordBoundary: true },
+      { trigger: ':urepro', replacement: 'Repro Rate:\n1. \n2. \n3. ', description: 'Repro steps template', appFilter: [], wordBoundary: true },
+    ],
+  },
+  {
+    id: 'unity-daily',
+    title: 'Daily Workflow',
+    description: 'Standup, commit and task notes used across Unity, Rider and chat tools.',
+    items: [
+      { trigger: ':standup', replacement: 'Dün:\nBugün:\nBloker:', description: 'Daily standup template', appFilter: [], wordBoundary: true },
+      { trigger: ':task', replacement: 'Görev:\nDurum:\nSonraki Adım:', description: 'Task update template', appFilter: [], wordBoundary: true },
+      { trigger: ':commitnote', replacement: 'Özet:\nEtkilenen Alan:\nRisk:', description: 'Commit / changelog note', appFilter: ['rider64.exe', 'rider.exe', 'code.exe'], wordBoundary: true },
+      { trigger: ':scenecheck', replacement: 'Sahne:\nPrefab:\nBağımlılıklar:\nTest Durumu:', description: 'Scene validation checklist', appFilter: ['unity.exe'], wordBoundary: true },
+    ],
+  },
+];
+
 const APP_FILTER_LABELS = {
   en: {
     all: 'All apps',
@@ -64,6 +99,13 @@ const TEXT_EXPANSION_I18N = {
     customExePlaceholder: 'Unity.exe, Rider64.exe, Code.exe',
     dynamicTitle: 'Dynamic Variables',
     dynamicDescription: 'Variables resolve when the expansion fires, not when it is saved.',
+    packagesTitle: 'Unity Game Dev Packs',
+    packagesDescription: 'Install daily-use expansions one by one or add a whole package in one step.',
+    installAllPacks: 'Install All Packs',
+    installPack: 'Install Pack',
+    installItem: 'Install Item',
+    installed: 'Installed',
+    skipped: 'Skipped',
     emptyTitle: 'No text expansions found',
     emptyDescription: 'Try a different search or create a new trigger.',
     noDescription: 'No description',
@@ -79,6 +121,9 @@ const TEXT_EXPANSION_I18N = {
     toastDefaults: 'Default text expansions restored.',
     toastImported: 'Text expansions imported.',
     toastExported: 'Export saved.',
+    toastPackInstalled: (title, added, skipped) => `${title}: ${added} installed, ${skipped} skipped.`,
+    toastItemInstalled: (trigger) => `${trigger} installed.`,
+    toastItemSkipped: (trigger) => `${trigger} already exists.`,
     errorTriggerRequired: 'Trigger is required.',
     errorReplacementRequired: 'Replacement is required.',
     errorConflict: 'Trigger conflict detected.',
@@ -130,6 +175,13 @@ const TEXT_EXPANSION_I18N = {
     customExePlaceholder: 'Unity.exe, Rider64.exe, Code.exe',
     dynamicTitle: 'Dinamik Değişkenler',
     dynamicDescription: 'Değişkenler kayıt edilirken değil, genişleme çalıştığı anda çözülür.',
+    packagesTitle: 'Unity Game Dev Paketleri',
+    packagesDescription: 'Günlük kullanılan expansion setlerini tek tek ya da tüm paket halinde kurun.',
+    installAllPacks: 'Tüm Paketleri Kur',
+    installPack: 'Paketi Kur',
+    installItem: 'Öğeyi Kur',
+    installed: 'Kuruldu',
+    skipped: 'Atlandı',
     emptyTitle: 'Metin genişletme bulunamadı',
     emptyDescription: 'Farklı bir arama deneyin veya yeni bir tetikleyici oluşturun.',
     noDescription: 'Açıklama yok',
@@ -145,6 +197,9 @@ const TEXT_EXPANSION_I18N = {
     toastDefaults: 'Varsayılan metin genişletmeler geri yüklendi.',
     toastImported: 'Metin genişletmeler içe aktarıldı.',
     toastExported: 'Dışa aktarma kaydedildi.',
+    toastPackInstalled: (title, added, skipped) => `${title}: ${added} kuruldu, ${skipped} atlandı.`,
+    toastItemInstalled: (trigger) => `${trigger} kuruldu.`,
+    toastItemSkipped: (trigger) => `${trigger} zaten mevcut.`,
     errorTriggerRequired: 'Tetikleyici gerekli.',
     errorReplacementRequired: 'Yerine geçecek metin gerekli.',
     errorConflict: 'Tetikleyici çakışması algılandı.',
@@ -299,12 +354,31 @@ export function setupTextExpansionPanel({
   const panelDescription = document.getElementById('textExpansionPanelDescription');
   const dynamicTitle = document.getElementById('textExpansionDynamicTitle');
   const dynamicDescription = document.getElementById('textExpansionDynamicDescription');
+  const packagesTitle = document.getElementById('textExpansionPackagesTitle');
+  const packagesDescription = document.getElementById('textExpansionPackagesDescription');
+  const packagesList = document.getElementById('textExpansionPackagesList');
+  const installAllPackagesButton = document.getElementById('textExpansionInstallAllPackagesBtn');
 
   let expansions = [];
   let editingId = null;
   let isOpen = false;
   let searchTerm = '';
   let loadPromise = null;
+  let isMutating = false;
+  let renderQueued = false;
+  let suppressRemoteReloadUntil = 0;
+
+  function setOpenButtonState(open) {
+    if (!openButton) {
+      return;
+    }
+    openButton.classList.toggle('text-d-primary', open);
+    openButton.classList.toggle('bg-d-primary/15', open);
+    openButton.classList.toggle('text-d-dim', !open);
+    openButton.innerHTML = open
+      ? '<span class="material-symbols-outlined" style="font-size:20px;">arrow_back</span>'
+      : '<span class="material-symbols-outlined" style="font-size:20px;">text_snippet</span>';
+  }
 
   if (panel) {
     panel.dataset.locale = locale;
@@ -398,6 +472,15 @@ export function setupTextExpansionPanel({
     if (dynamicDescription) {
       dynamicDescription.textContent = ui.dynamicDescription;
     }
+    if (packagesTitle) {
+      packagesTitle.textContent = ui.packagesTitle;
+    }
+    if (packagesDescription) {
+      packagesDescription.textContent = ui.packagesDescription;
+    }
+    if (installAllPackagesButton) {
+      installAllPackagesButton.textContent = ui.installAllPacks;
+    }
     if (searchInput) {
       searchInput.placeholder = ui.searchPlaceholder;
     }
@@ -443,6 +526,94 @@ export function setupTextExpansionPanel({
         appFilterPreview.textContent = appFilterLabel(APP_FILTER_PRESETS[currentMode] || [], locale);
       }
     }
+  }
+
+  function scheduleRender() {
+    if (renderQueued) {
+      return;
+    }
+    renderQueued = true;
+    requestAnimationFrame(() => {
+      renderQueued = false;
+      renderList();
+      renderPackages();
+    });
+  }
+
+  function setBusy(value) {
+    isMutating = value;
+    [
+      saveButton,
+      deleteButton,
+      clearButton,
+      defaultsButton,
+      importButton,
+      exportButton,
+      addButton,
+      installAllPackagesButton,
+      triggerInput,
+      descriptionInput,
+      replacementInput,
+      enabledToggle,
+      caseSensitiveToggle,
+      wordBoundaryToggle,
+      appFilterMode,
+      appFilterCustom,
+      searchInput,
+    ].forEach((element) => {
+      if (!element) {
+        return;
+      }
+      element.disabled = value;
+    });
+  }
+
+  function markLocalMutation() {
+    suppressRemoteReloadUntil = Date.now() + 1200;
+  }
+
+  function triggerExists(trigger, ignoreId = null) {
+    const key = normalizeTrigger(trigger);
+    if (!key) return false;
+    return expansions.some((item) => {
+      if (ignoreId && item.id === ignoreId) {
+        return false;
+      }
+      return normalizeTrigger(item.trigger) === key;
+    });
+  }
+
+  function buildPackageItem(baseItem) {
+    const now = new Date().toISOString();
+    return {
+      id: crypto.randomUUID(),
+      trigger: baseItem.trigger.trim(),
+      replacement: normalizeClipboardFriendlyText(baseItem.replacement),
+      description: baseItem.description || undefined,
+      enabled: baseItem.enabled !== false,
+      caseSensitive: !!baseItem.caseSensitive,
+      wordBoundary: baseItem.wordBoundary !== false,
+      appFilter: uniqueNormalized(baseItem.appFilter || []),
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  function mergePackageItems(sourceItems) {
+    const next = [...expansions];
+    let added = 0;
+    let skipped = 0;
+
+    sourceItems.forEach((item) => {
+      if (triggerExists(item.trigger)) {
+        skipped += 1;
+        return;
+      }
+      next.push(buildPackageItem(item));
+      added += 1;
+    });
+
+    return { next, added, skipped };
   }
 
   function getFilteredExpansions() {
@@ -532,7 +703,7 @@ export function setupTextExpansionPanel({
     conflictWarning.textContent = ui.conflictWarning;
     saveButton.disabled = false;
     deleteButton.disabled = true;
-    renderList();
+    scheduleRender();
   }
 
   function loadItemIntoForm(item) {
@@ -549,6 +720,7 @@ export function setupTextExpansionPanel({
     conflictWarning.textContent = ui.conflictWarning;
     saveButton.disabled = false;
     deleteButton.disabled = false;
+    scheduleRender();
   }
 
   function normalizeFormPayload(existing = null) {
@@ -623,16 +795,87 @@ export function setupTextExpansionPanel({
     });
   }
 
+  function renderPackages() {
+    if (!packagesList) {
+      return;
+    }
+
+    packagesList.innerHTML = '';
+
+    UNITY_PACKAGES.forEach((pkg) => {
+      const installedCount = pkg.items.filter((item) => triggerExists(item.trigger)).length;
+      const card = document.createElement('section');
+      card.className = 'rounded-xl border dark:border-d-border dark:bg-d-input/60 p-3 flex flex-col gap-3';
+
+      const itemsHtml = pkg.items.map((item) => {
+        const installed = triggerExists(item.trigger);
+        return `
+          <div class="rounded-lg border dark:border-d-border/70 dark:bg-black/10 px-3 py-2 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2 py-0.5 rounded bg-d-primary/15 text-d-primary text-[10px] font-mono font-bold">${escapeHtml(item.trigger)}</span>
+                <span class="text-[10px] dark:text-d-dim">${escapeHtml(item.description || '')}</span>
+              </div>
+              <div class="text-[10px] dark:text-d-dim mt-1 truncate">${escapeHtml(normalizeClipboardFriendlyText(item.replacement).replace(/\n/g, ' ⏎ '))}</div>
+            </div>
+            <button
+              type="button"
+              data-package-item-trigger="${escapeHtml(item.trigger)}"
+              class="px-2.5 py-1 rounded-md text-[10px] font-semibold ${installed ? 'dark:bg-d-border/40 dark:text-d-dim' : 'bg-d-primary text-black'}"
+              ${installed || isMutating ? 'disabled' : ''}
+            >
+              ${installed ? escapeHtml(ui.installed) : escapeHtml(ui.installItem)}
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="font-semibold text-sm dark:text-d-text">${escapeHtml(pkg.title)}</div>
+            <div class="text-xs dark:text-d-dim mt-1">${escapeHtml(pkg.description)}</div>
+          </div>
+          <button
+            type="button"
+            data-package-id="${escapeHtml(pkg.id)}"
+            class="px-3 py-1.5 rounded-lg text-xs font-semibold ${installedCount === pkg.items.length ? 'dark:bg-d-border/40 dark:text-d-dim' : 'dark:bg-d-card bg-d-primary text-black'}"
+            ${installedCount === pkg.items.length || isMutating ? 'disabled' : ''}
+          >
+            ${installedCount === pkg.items.length ? escapeHtml(ui.installed) : escapeHtml(ui.installPack)}
+          </button>
+        </div>
+        <div class="text-[10px] dark:text-d-dim">${installedCount}/${pkg.items.length} ${escapeHtml(ui.installed.toLowerCase())}</div>
+        <div class="flex flex-col gap-2">${itemsHtml}</div>
+      `;
+
+      card.querySelector(`[data-package-id="${pkg.id}"]`)?.addEventListener('click', async () => {
+        await installPackage(pkg.id);
+      });
+
+      pkg.items.forEach((item) => {
+        card.querySelector(`[data-package-item-trigger="${item.trigger}"]`)?.addEventListener('click', async () => {
+          await installPackageItem(item);
+        });
+      });
+
+      packagesList.appendChild(card);
+    });
+  }
+
   async function loadTextExpansions() {
     const items = await invoke('load_text_expansions');
     expansions = Array.isArray(items) ? items : [];
     if (editingId && !expansions.some((item) => item.id === editingId)) {
       clearForm();
     }
-    renderList();
+    scheduleRender();
   }
 
   async function saveCurrent() {
+    if (isMutating) {
+      return;
+    }
     const existing = expansions.find((item) => item.id === editingId) || null;
     const payload = normalizeFormPayload(existing);
     if (!payload.trigger) {
@@ -656,17 +899,22 @@ export function setupTextExpansionPanel({
       : [...expansions, payload];
 
     try {
+      setBusy(true);
+      markLocalMutation();
       const saved = await invoke('save_text_expansions', { items: nextItems });
       expansions = Array.isArray(saved) ? saved : nextItems;
       editingId = payload.id;
-      renderList();
       const savedItem = expansions.find((item) => item.id === payload.id);
+      scheduleRender();
       if (savedItem) {
         loadItemIntoForm(savedItem);
       }
       showToast(existing ? ui.toastUpdated : ui.toastCreated, 1400, 'success');
     } catch (error) {
       showToast(String(error), 1800, 'error');
+    } finally {
+      setBusy(false);
+      updateConflictState();
     }
   }
 
@@ -680,6 +928,9 @@ export function setupTextExpansionPanel({
   }
 
   async function deleteCurrent() {
+    if (isMutating) {
+      return;
+    }
     if (!editingId) {
       return;
     }
@@ -696,49 +947,143 @@ export function setupTextExpansionPanel({
 
     const nextItems = expansions.filter((entry) => entry.id !== editingId);
     try {
+      setBusy(true);
+      markLocalMutation();
       const saved = await invoke('save_text_expansions', { items: nextItems });
       expansions = Array.isArray(saved) ? saved : nextItems;
       clearForm();
-      renderList();
+      scheduleRender();
       showToast(ui.toastDeleted, 1200, 'info');
     } catch (error) {
       showToast(String(error), 1800, 'error');
+    } finally {
+      setBusy(false);
     }
   }
 
   async function loadDefaults() {
+    if (isMutating) {
+      return;
+    }
     try {
+      setBusy(true);
+      markLocalMutation();
       const saved = await invoke('reset_text_expansions');
       expansions = Array.isArray(saved) ? saved : [];
       clearForm();
-      renderList();
+      scheduleRender();
       showToast(ui.toastDefaults, 1400, 'success');
     } catch (error) {
       showToast(String(error), 1800, 'error');
+    } finally {
+      setBusy(false);
     }
   }
 
   async function importExpansions() {
+    if (isMutating) {
+      return;
+    }
     try {
+      setBusy(true);
+      markLocalMutation();
       const imported = await invoke('import_text_expansions', { locale });
       if (!imported) {
         return;
       }
       expansions = Array.isArray(imported) ? imported : expansions;
       clearForm();
-      renderList();
+      scheduleRender();
       showToast(ui.toastImported, 1400, 'success');
+    } catch (error) {
+      showToast(String(error), 1800, 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function exportExpansions() {
+    if (isMutating) {
+      return;
+    }
+    try {
+      setBusy(true);
+      const exported = await invoke('export_text_expansions', { locale });
+      if (exported) {
+        showToast(ui.toastExported, 1200, 'success');
+      }
+    } catch (error) {
+      showToast(String(error), 1800, 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function commitExpansionList(nextItems) {
+    setBusy(true);
+    markLocalMutation();
+    try {
+      const saved = await invoke('save_text_expansions', { items: nextItems });
+      expansions = Array.isArray(saved) ? saved : nextItems;
+      scheduleRender();
+      return expansions;
+    } finally {
+      setBusy(false);
+      updateConflictState();
+    }
+  }
+
+  async function installPackageItem(item) {
+    if (isMutating) {
+      return;
+    }
+    if (triggerExists(item.trigger)) {
+      showToast(ui.toastItemSkipped(item.trigger), 1200, 'info');
+      return;
+    }
+    try {
+      const nextItems = [...expansions, buildPackageItem(item)];
+      await commitExpansionList(nextItems);
+      showToast(ui.toastItemInstalled(item.trigger), 1400, 'success');
     } catch (error) {
       showToast(String(error), 1800, 'error');
     }
   }
 
-  async function exportExpansions() {
+  async function installPackage(packageId) {
+    if (isMutating) {
+      return;
+    }
+    const pkg = UNITY_PACKAGES.find((entry) => entry.id === packageId);
+    if (!pkg) {
+      return;
+    }
     try {
-      const exported = await invoke('export_text_expansions', { locale });
-      if (exported) {
-        showToast(ui.toastExported, 1200, 'success');
+      const { next, added, skipped } = mergePackageItems(pkg.items);
+      if (added === 0) {
+        showToast(ui.toastPackInstalled(pkg.title, added, skipped), 1500, 'info');
+        return;
       }
+      await commitExpansionList(next);
+      showToast(ui.toastPackInstalled(pkg.title, added, skipped), 1600, 'success');
+    } catch (error) {
+      showToast(String(error), 1800, 'error');
+    }
+  }
+
+  async function installAllPackages() {
+    if (isMutating) {
+      return;
+    }
+    try {
+      const allItems = UNITY_PACKAGES.flatMap((pkg) => pkg.items);
+      const { next, added, skipped } = mergePackageItems(allItems);
+      if (added === 0) {
+        showToast(ui.toastPackInstalled(ui.installAllPacks, added, skipped), 1600, 'info');
+        return;
+      }
+      await commitExpansionList(next);
+      showToast(ui.toastPackInstalled(ui.installAllPacks, added, skipped), 1800, 'success');
     } catch (error) {
       showToast(String(error), 1800, 'error');
     }
@@ -749,10 +1094,17 @@ export function setupTextExpansionPanel({
       return;
     }
     isOpen = true;
-    panelTrack.classList.remove('settings-open', 'dashboard-open');
+    setOpenButtonState(true);
+    panelTrack.classList.remove('settings-open', 'dashboard-open', 'text-expansion-open');
     panelTrack.classList.add('text-expansion-open');
     setWindowSize(true);
-    setTimeout(() => searchInput.focus(), 40);
+    scheduleRender();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scheduleRender();
+        searchInput.focus();
+      });
+    });
     window.dispatchEvent(new CustomEvent('text-expansion-opened'));
   }
 
@@ -761,6 +1113,7 @@ export function setupTextExpansionPanel({
       return;
     }
     isOpen = false;
+    setOpenButtonState(false);
     panelTrack.classList.remove('text-expansion-open');
     setWindowSize(false);
     window.dispatchEvent(new CustomEvent('text-expansion-closed'));
@@ -773,7 +1126,7 @@ export function setupTextExpansionPanel({
   function attachEvents() {
     searchInput.addEventListener('input', () => {
       searchTerm = searchInput.value;
-      renderList();
+      scheduleRender();
     });
 
     triggerInput.addEventListener('input', refreshConflictWarning);
@@ -811,8 +1164,15 @@ export function setupTextExpansionPanel({
     importButton.addEventListener('click', importExpansions);
     exportButton.addEventListener('click', exportExpansions);
     addButton.addEventListener('click', clearForm);
+    installAllPackagesButton?.addEventListener('click', installAllPackages);
     backButton.addEventListener('click', closePanel);
-    openButton?.addEventListener('click', openPanel);
+    openButton?.addEventListener('click', () => {
+      if (isOpen) {
+        closePanel();
+        return;
+      }
+      openPanel();
+    });
     openFromSettingsButton?.addEventListener('click', openPanel);
 
   }
@@ -824,20 +1184,24 @@ export function setupTextExpansionPanel({
       return;
     }
     const handle = await listen('text-expansions-updated', async () => {
+      if (isMutating || Date.now() < suppressRemoteReloadUntil) {
+        return;
+      }
       await loadTextExpansions();
     });
     eventUnsubscribe.push(handle);
   }
 
   applyLocale();
+  setOpenButtonState(false);
   attachEvents();
   void attachListeners();
 
   loadPromise = loadTextExpansions()
     .then(() => {
-      renderList();
       clearForm();
       updateConflictState();
+      scheduleRender();
     })
     .catch((error) => {
       showToast(String(error), 1800, 'error');
@@ -849,8 +1213,8 @@ export function setupTextExpansionPanel({
     isOpen: () => isOpen,
     refresh: async () => {
       await loadTextExpansions();
-      renderList();
       refreshConflictWarning();
+      scheduleRender();
     },
     ready: () => loadPromise,
     dispose: async () => {
