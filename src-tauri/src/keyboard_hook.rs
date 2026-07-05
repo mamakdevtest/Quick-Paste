@@ -11,7 +11,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     KBDLLHOOKSTRUCT, MSG, WM_KEYDOWN, WM_SYSKEYDOWN,
 };
 
-use crate::text_expansion::{self, TerminatorKind};
+use crate::{clipboard_monitor, clipboard_manager, text_expansion::{self, TerminatorKind}};
 
 const VK_BACK: u32 = 0x08;
 const VK_TAB: u32 = 0x09;
@@ -82,7 +82,10 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: usize, lparam: i
         return CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam);
     }
 
-    let mut buffer = TYPED_BUFFER.lock().unwrap_or_else(|e| e.into_inner());
+    let mut buffer = match TYPED_BUFFER.try_lock() {
+        Ok(guard) => guard,
+        Err(_) => return CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam),
+    };
 
     if vk == VK_BACK {
         text_expansion::backspace_buffer(&mut buffer);
@@ -103,14 +106,14 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: usize, lparam: i
         drop(buffer);
 
         if let Some(matched) = text_expansion::evaluate_match(&buffer_snapshot, &terminator) {
-            if let Ok(mut live_buffer) = TYPED_BUFFER.lock() {
+            if let Ok(mut live_buffer) = TYPED_BUFFER.try_lock() {
                 text_expansion::clear_buffer(&mut live_buffer);
             }
             trigger_expansion(matched);
             return 1;
         }
 
-        if let Ok(mut live_buffer) = TYPED_BUFFER.lock() {
+        if let Ok(mut live_buffer) = TYPED_BUFFER.try_lock() {
             if let Some(value) = punctuation_text.as_deref() {
                 text_expansion::append_text(&mut live_buffer, value);
             } else {
@@ -183,7 +186,13 @@ fn needs_clipboard_fallback(text: &str) -> bool {
 }
 
 fn paste_via_clipboard(replacement: &str, suffix: Option<&str>) -> Result<(), String> {
-    let previous_clipboard = read_clipboard_text();
+    let previous_clipboard = match clipboard_manager::capture_clipboard_snapshot() {
+        Some(snapshot) => snapshot,
+        None => {
+            return Err("failed to capture clipboard snapshot".to_string());
+        }
+    };
+    clipboard_monitor::suppress_updates_for(Duration::from_millis(1500));
     set_clipboard_text_with_retry(replacement)?;
 
     unsafe {
@@ -198,9 +207,10 @@ fn paste_via_clipboard(replacement: &str, suffix: Option<&str>) -> Result<(), St
         }
     }
 
-    thread::sleep(Duration::from_millis(70));
-    if let Some(previous) = previous_clipboard {
-        let _ = set_clipboard_text_with_retry(&previous);
+    // Give the target app time to consume the clipboard before restoring it.
+    thread::sleep(Duration::from_millis(180));
+    if let Err(err) = clipboard_manager::restore_clipboard_snapshot(&previous_clipboard) {
+        eprintln!("[QuickPaste] clipboard restore failed after expansion: {}", err);
     }
 
     Ok(())
@@ -224,11 +234,6 @@ fn set_clipboard_text_with_retry(content: &str) -> Result<(), String> {
         wait_ms = (wait_ms * 2).min(400);
     }
     Err("failed to write clipboard text".to_string())
-}
-
-fn read_clipboard_text() -> Option<String> {
-    let mut ctx = arboard::Clipboard::new().ok()?;
-    ctx.get_text().ok()
 }
 
 fn classify_terminator(vk: u32, text: Option<&str>) -> Option<TerminatorKind> {

@@ -139,6 +139,13 @@
       border-top: 1px solid transparent;
       border-bottom: 1px solid transparent;
     }
+    body.launcher-mode #mainPageBtn,
+    body.launcher-mode #settingsBtn,
+    body.launcher-mode #openLauncherBtn,
+    body.launcher-mode #textExpansionBtn,
+    body.launcher-mode #addBtn {
+      display: none !important;
+    }
     body.launcher-mode #bodyArea {
       flex: 1;
       width: 680px;
@@ -470,6 +477,11 @@
   <header id="headerFrame" class="flex items-center justify-between px-4 py-2.5 border-b dark:border-d-border shrink-0">
     <div id="appTitle" class="text-lg font-bold tracking-wide text-d-primary select-none">QuickPaste</div>
     <div class="flex items-center gap-2">
+      <!-- Main page button -->
+      <button id="mainPageBtn" title="Main Page / Ana Sayfa"
+        class="w-7 h-7 rounded flex items-center justify-center text-d-dim dark:hover:bg-d-hover hover:text-d-text transition-colors">
+        <span class="material-symbols-outlined" style="font-size:20px;">home</span>
+      </button>
       <!-- Pin button -->
       <button id="pinWindowBtn" title="Toggle Pinned Mode"
         class="w-8 h-8 rounded border-2 border-d-primary bg-indigo-900/40 flex items-center justify-content-center justify-center hover:bg-indigo-800/60 transition-colors">

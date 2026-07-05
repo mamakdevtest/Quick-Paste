@@ -354,7 +354,7 @@ fn snippet_timestamp_to_rfc3339(value: u64) -> Option<String> {
 }
 
 fn resolve_dynamic_variables(text: &str) -> String {
-    let clipboard_text = read_clipboard_text().unwrap_or_default();
+    let clipboard_text = clipboard_manager::read_clipboard_text_with_retry(5, 8).unwrap_or_default();
     let now = Local::now();
     let date_str = now.format("%d.%m.%Y").to_string();
     let time_str = now.format("%H:%M:%S").to_string();
@@ -401,11 +401,6 @@ fn resolve_random(token: &str) -> Option<String> {
     let (min, max) = if start <= end { (start, end) } else { (end, start) };
     let mut rng = rand::thread_rng();
     Some(rng.gen_range(min..=max).to_string())
-}
-
-fn read_clipboard_text() -> Option<String> {
-    let mut clipboard = arboard::Clipboard::new().ok()?;
-    clipboard.get_text().ok()
 }
 
 fn app_filter_matches(expansion: &TextExpansion, active_process: &str) -> bool {

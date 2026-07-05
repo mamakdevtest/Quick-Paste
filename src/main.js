@@ -66,6 +66,7 @@ const bulkActionBar   = document.getElementById('bulkActionBar');
 const selectedCount   = document.getElementById('selectedCount');
 const bulkDeleteBtn   = document.getElementById('bulkDeleteBtn');
 const bulkCancelBtn   = document.getElementById('bulkCancelBtn');
+const mainPageBtn     = document.getElementById('mainPageBtn');
 const openLauncherBtn = document.getElementById('openLauncherBtn');
 const openSettingsBtn = document.getElementById('openSettingsBtn');
 const dashboardBtn    = document.getElementById('dashboardBtn');
@@ -86,6 +87,7 @@ function setHeaderButtonActive(button, active) {
 function applyPanelHeaderState(panel) {
   settingsOpen = panel === 'settings';
   dashboardOpen = panel === 'dashboard';
+  const textExpansionOpen = !!textExpansionPanel?.isOpen?.();
 
   panelTrack.classList.remove('settings-open', 'dashboard-open');
   if (panel === 'settings') {
@@ -94,10 +96,20 @@ function applyPanelHeaderState(panel) {
     panelTrack.classList.add('dashboard-open');
   }
 
+  setHeaderButtonActive(mainPageBtn, !settingsOpen && !dashboardOpen && !textExpansionOpen);
   setHeaderButtonActive(settingsBtn, settingsOpen);
   setHeaderButtonActive(dashboardBtn, dashboardOpen);
   settingsBtn.innerHTML = settingsOpen ? BACK_ICON_HTML : SETTINGS_ICON_HTML;
   dashboardBtn.innerHTML = dashboardOpen ? BACK_ICON_HTML : DASHBOARD_ICON_HTML;
+}
+
+function returnToMainPage() {
+  if (textExpansionPanel?.isOpen()) {
+    textExpansionPanel.closePanel();
+  }
+  applyPanelHeaderState(null);
+  resizeForSidePanel(false);
+  setTimeout(() => searchInput.focus(), 280);
 }
 
 function resizeForSidePanel(isOpen) {
@@ -205,6 +217,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyPanelHeaderState(null);
 
   window.addEventListener('text-expansion-opened', () => {
+    applyPanelHeaderState(null);
+  });
+  window.addEventListener('text-expansion-closed', () => {
     applyPanelHeaderState(null);
   });
 
@@ -979,15 +994,11 @@ window.addEventListener('keydown', async e => {
     if (!dialogOverlay.classList.contains('hidden')) { closeDialog(); return; }
     if (multiSelectMode) { bulkCancelBtn.click(); return; }
     if (settingsOpen) {
-      applyPanelHeaderState(null);
-      resizeForSidePanel(false);
-      setTimeout(() => searchInput.focus(), 280);
+      returnToMainPage();
       return;
     }
     if (dashboardOpen) {
-      applyPanelHeaderState(null);
-      resizeForSidePanel(false);
-      setTimeout(() => searchInput.focus(), 280);
+      returnToMainPage();
       return;
     }
     if (searchInput.value) {
@@ -1906,9 +1917,7 @@ dashboardBtn.addEventListener('click', () => {
     resizeForSidePanel(true);
     updateDashboardStats();
   } else {
-    applyPanelHeaderState(null);
-    resizeForSidePanel(false);
-    setTimeout(() => searchInput.focus(), 280);
+    returnToMainPage();
   }
 });
 
@@ -1923,11 +1932,13 @@ settingsBtn.addEventListener('click', () => {
     applyPanelHeaderState('settings');
     resizeForSidePanel(true);
   } else {
-    applyPanelHeaderState(null);
-    resizeForSidePanel(false);
-    setTimeout(() => searchInput.focus(), 280);
+    returnToMainPage();
   }
 });
+
+if (mainPageBtn) {
+  mainPageBtn.addEventListener('click', returnToMainPage);
+}
 
 
 // ─── Paste Stack (Sıralı Yapıştırma) ─────────────────────────────────────────────

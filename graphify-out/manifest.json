@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "src-tauri/src/data_store.rs": {
-    "mtime": 1783177775.4016886,
-    "ast_hash": "fd31a35931c0bbb192f0ce20093e8b07",
+    "mtime": 1783200848.0256703,
+    "ast_hash": "4b8e0bf6ac7385ff98ee0ee0aa5c143a",
     "semantic_hash": ""
   },
   "src-tauri/src/keyboard_hook.rs": {
@@ -55,13 +55,13 @@
     "semantic_hash": ""
   },
   "src/features.js": {
-    "mtime": 1783177775.405204,
-    "ast_hash": "059579a5109e04e5bfa4f13b1b2958e6",
+    "mtime": 1783200633.2380996,
+    "ast_hash": "e5ec11e75acfb73f3f7e03b7953a9d50",
     "semantic_hash": ""
   },
   "src/main.js": {
-    "mtime": 1783198566.3855586,
-    "ast_hash": "5ba5a68f9b8670f638d6a333f8b9e9bd",
+    "mtime": 1783242198.4183686,
+    "ast_hash": "9c2bbf60781c2a40504bbfe4ae1e0d2c",
     "semantic_hash": ""
   },
   "AboutProject.md": {
@@ -80,8 +80,8 @@
     "semantic_hash": ""
   },
   "src/index.html": {
-    "mtime": 1783198342.3552587,
-    "ast_hash": "1a2becf054c32ce90074bebbba92412f",
+    "mtime": 1783242717.9892125,
+    "ast_hash": "227a88bf8bcf8b36855541ea6d9adf0d",
     "semantic_hash": ""
   },
   "src-tauri/icons/128x128.png": {
@@ -180,8 +180,8 @@
     "semantic_hash": ""
   },
   "src/text-expansion-panel.js": {
-    "mtime": 1783198662.033982,
-    "ast_hash": "48646e8559027f37f89d5a203f3c16e6",
+    "mtime": 1783201760.8063636,
+    "ast_hash": "c918d97d1b7c322240142c8b879671cd",
     "semantic_hash": ""
   },
   "logo.png": {

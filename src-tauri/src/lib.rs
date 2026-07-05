@@ -64,6 +64,15 @@ fn capture_target(state: &AppState) {
     }
 }
 
+fn resolve_paste_target(state: &AppState, hwnd: Option<isize>) -> isize {
+    if let Some(target) = hwnd.filter(|value| *value != 0) {
+        return target;
+    }
+
+    capture_target(state);
+    *state.previous_window.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 fn show_window(win: &tauri::WebviewWindow, state: &AppState) {
     capture_target(state);
     let _ = win.show();
@@ -237,12 +246,23 @@ fn capture_foreground_window(state: State<'_, AppState>) -> isize {
 #[tauri::command]
 fn copy_and_paste(state: State<'_, AppState>, content: String, hwnd: Option<isize>, skip_copy: bool) -> bool {
     let content_len = content.len();
+    #[cfg(target_os = "windows")]
+    let clipboard_snapshot = if skip_copy {
+        None
+    } else {
+        clipboard_manager::capture_clipboard_snapshot()
+    };
+    #[cfg(not(target_os = "windows"))]
+    let clipboard_snapshot = None;
 
     let mut success = false;
     let mut last_attempt = 0;
     let mut wait_ms = 10u64;
 
     if !skip_copy {
+        #[cfg(target_os = "windows")]
+        clipboard_monitor::suppress_updates_for(Duration::from_millis(1500));
+
         // Retry writing to clipboard multiple times with exponential backoff
         for attempt in 1..=6 {
             last_attempt = attempt;
@@ -274,15 +294,36 @@ fn copy_and_paste(state: State<'_, AppState>, content: String, hwnd: Option<isiz
         println!("[QuickPaste] Skipping clipboard write as requested (content_len={})", content_len);
     }
 
-    let target = hwnd.unwrap_or_else(|| *state.previous_window.lock().unwrap_or_else(|e| e.into_inner()));
+    let target = resolve_paste_target(&state, hwnd);
+    let mut paste_success = false;
+
     if target != 0 {
         // Sleep slightly to let the clipboard register before activating focus and pasting
-        thread::sleep(Duration::from_millis(60));
+        thread::sleep(Duration::from_millis(80));
         println!("[QuickPaste] Pasting to target hwnd={} (content_len={})", target, content_len);
-        let _ = clipboard_manager::restore_focus_and_paste(target);
+        paste_success = clipboard_manager::restore_focus_and_paste(target);
+        if !paste_success {
+            eprintln!("[QuickPaste] copy_and_paste: paste injection failed for target hwnd={}", target);
+        }
+    } else {
+        eprintln!("[QuickPaste] copy_and_paste: no valid paste target found (content_len={})", content_len);
     }
 
-    true
+    #[cfg(target_os = "windows")]
+    if let Some(snapshot) = clipboard_snapshot {
+        // Give the target app enough time to read the temporary clipboard contents.
+        thread::sleep(Duration::from_millis(180));
+        clipboard_monitor::suppress_updates_for(Duration::from_millis(1500));
+        if let Err(err) = clipboard_manager::restore_clipboard_snapshot(&snapshot) {
+            eprintln!("[QuickPaste] copy_and_paste: failed to restore clipboard snapshot: {}", err);
+        }
+    }
+
+    if skip_copy {
+        paste_success
+    } else {
+        success && paste_success
+    }
 }
 
 #[tauri::command]

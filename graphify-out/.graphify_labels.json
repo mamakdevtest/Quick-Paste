@@ -33,5 +33,6 @@
   "31": "INPUT",
   "32": "Vec",
   "33": "AppHandle",
-  "34": "Mutex"
+  "34": "Mutex",
+  "35": "applyPanelHeaderState"
 }

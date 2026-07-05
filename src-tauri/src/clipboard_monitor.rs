@@ -1,13 +1,32 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 
 #[derive(serde::Serialize, Clone)]
 struct ClipboardPayload {
     text: String,
     source_app: String,
+}
+
+static MONITOR_SUPPRESS_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
+fn clipboard_updates_suppressed() -> bool {
+    now_ms() < MONITOR_SUPPRESS_UNTIL_MS.load(Ordering::SeqCst)
+}
+
+pub fn suppress_updates_for(duration: Duration) {
+    let until = now_ms().saturating_add(duration.as_millis() as u64);
+    MONITOR_SUPPRESS_UNTIL_MS.store(until, Ordering::SeqCst);
 }
 
 fn is_password_manager(proc_name: &str) -> bool {
@@ -21,21 +40,23 @@ fn is_password_manager(proc_name: &str) -> bool {
 }
 
 fn process_new_clipboard_text(app_handle: &AppHandle, last_text: &Mutex<String>) {
-    if let Ok(mut clipboard) = arboard::Clipboard::new() {
-        if let Ok(current) = clipboard.get_text() {
-            let trimmed = current.trim();
-            if !trimmed.is_empty() {
-                if let Ok(mut last) = last_text.lock() {
-                    if current != *last {
-                        let proc_name = crate::clipboard_manager::get_active_process_name();
-                        if !is_password_manager(&proc_name) {
-                            *last = current.clone();
-                            let payload = ClipboardPayload {
-                                text: current,
-                                source_app: proc_name,
-                            };
-                            let _ = app_handle.emit("new-clipboard-entry", payload);
-                        }
+    if clipboard_updates_suppressed() {
+        return;
+    }
+
+    if let Some(current) = crate::clipboard_manager::read_clipboard_text_with_retry(5, 12) {
+        let trimmed = current.trim();
+        if !trimmed.is_empty() {
+            if let Ok(mut last) = last_text.lock() {
+                if current != *last {
+                    let proc_name = crate::clipboard_manager::get_active_process_name();
+                    if !is_password_manager(&proc_name) {
+                        *last = current.clone();
+                        let payload = ClipboardPayload {
+                            text: current,
+                            source_app: proc_name,
+                        };
+                        let _ = app_handle.emit("new-clipboard-entry", payload);
                     }
                 }
             }
@@ -77,7 +98,10 @@ unsafe extern "system" fn clipboard_wnd_proc(
         WM_CLIPBOARDUPDATE => {
             if let Ok(guard) = MONITOR_APP_HANDLE.lock() {
                 if let Some(ref app) = *guard {
-                    process_new_clipboard_text(app, &MONITOR_LAST_TEXT);
+                    let app = app.clone();
+                    thread::spawn(move || {
+                        process_new_clipboard_text(&app, &MONITOR_LAST_TEXT);
+                    });
                 }
             }
             0
@@ -119,11 +143,9 @@ impl ClipboardMonitor {
         }
 
         // Initialize last text
-        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-            if let Ok(txt) = clipboard.get_text() {
-                if let Ok(mut last) = MONITOR_LAST_TEXT.lock() {
-                    *last = txt;
-                }
+        if let Some(txt) = crate::clipboard_manager::read_clipboard_text_with_retry(5, 12) {
+            if let Ok(mut last) = MONITOR_LAST_TEXT.lock() {
+                *last = txt;
             }
         }
 
@@ -190,18 +212,16 @@ impl ClipboardMonitor {
             let last_text = Mutex::new(String::new());
 
             // Initialize last_text
-            if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                if let Ok(txt) = clipboard.get_text() {
-                    if let Ok(mut last) = last_text.lock() {
-                        *last = txt;
-                    }
+            if let Some(txt) = crate::clipboard_manager::read_clipboard_text_with_retry(5, 12) {
+                if let Ok(mut last) = last_text.lock() {
+                    *last = txt;
                 }
             }
 
-            while running.load(Ordering::SeqCst) {
-                process_new_clipboard_text(&app_handle, &last_text);
-                thread::sleep(Duration::from_millis(500));
-            }
+        while running.load(Ordering::SeqCst) {
+            process_new_clipboard_text(&app_handle, &last_text);
+            thread::sleep(Duration::from_millis(500));
+        }
         });
     }
 

@@ -6,12 +6,26 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
 };
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::System::Threading::{GetCurrentThreadId, AttachThreadInput};
-#[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetWindowThreadProcessId, SetForegroundWindow, BringWindowToTop, GetForegroundWindow,
-    ShowWindow, SW_RESTORE, IsIconic, GetClassNameW
+    ShowWindowAsync, SW_RESTORE, IsIconic, GetClassNameW, CopyImage, IMAGE_BITMAP,
+    LR_CREATEDIBSECTION,
 };
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::Memory::{
+    GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE, GMEM_ZEROINIT,
+};
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::Foundation::GlobalFree;
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::Graphics::Gdi::DeleteObject;
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::DataExchange::{
+    CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData, OpenClipboard,
+    SetClipboardData,
+};
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::Ole::CF_BITMAP;
 
 #[cfg(target_os = "windows")]
 pub fn get_foreground_window() -> isize {
@@ -75,6 +89,213 @@ pub fn get_active_process_name() -> String {
     }
 }
 
+pub fn read_clipboard_text_with_retry(max_attempts: usize, initial_delay_ms: u64) -> Option<String> {
+    let attempts = max_attempts.max(1);
+    let mut wait_ms = initial_delay_ms.max(1);
+    for attempt in 1..=attempts {
+        match arboard::Clipboard::new() {
+            Ok(mut ctx) => match ctx.get_text() {
+                Ok(text) => return Some(text),
+                Err(err) => {
+                    eprintln!("[QuickPaste] read_clipboard_text_with_retry failed on attempt {}: {}", attempt, err);
+                }
+            },
+            Err(err) => {
+                eprintln!("[QuickPaste] read_clipboard_text_with_retry init failed on attempt {}: {}", attempt, err);
+            }
+        }
+        thread::sleep(Duration::from_millis(wait_ms));
+        wait_ms = (wait_ms * 2).min(400);
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+#[derive(Clone, Debug)]
+pub struct ClipboardSnapshot {
+    formats: Vec<ClipboardFormatData>,
+}
+
+#[cfg(target_os = "windows")]
+#[derive(Clone, Debug)]
+struct ClipboardFormatData {
+    format: u32,
+    kind: ClipboardDataKind,
+}
+
+#[cfg(target_os = "windows")]
+#[derive(Clone, Debug)]
+enum ClipboardDataKind {
+    Memory(Vec<u8>),
+    Bitmap(isize),
+}
+
+#[cfg(target_os = "windows")]
+struct ClipboardOpenGuard;
+
+#[cfg(target_os = "windows")]
+impl Drop for ClipboardOpenGuard {
+    fn drop(&mut self) {
+        unsafe {
+            CloseClipboard();
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn open_clipboard_with_retry(max_attempts: usize, initial_delay_ms: u64) -> bool {
+    let attempts = max_attempts.max(1);
+    let mut wait_ms = initial_delay_ms.max(1);
+    for _ in 0..attempts {
+        let opened = unsafe { OpenClipboard(std::ptr::null_mut()) } != 0;
+        if opened {
+            return true;
+        }
+        thread::sleep(Duration::from_millis(wait_ms));
+        wait_ms = (wait_ms * 2).min(400);
+    }
+    false
+}
+
+#[cfg(target_os = "windows")]
+pub fn capture_clipboard_snapshot() -> Option<ClipboardSnapshot> {
+    if !open_clipboard_with_retry(5, 8) {
+        return None;
+    }
+    let _guard = ClipboardOpenGuard;
+
+    let mut formats = Vec::new();
+    let mut current_format: u32 = 0;
+    loop {
+        let next = unsafe { EnumClipboardFormats(current_format) };
+        if next == 0 {
+            break;
+        }
+        current_format = next;
+
+        let handle = unsafe { GetClipboardData(next) };
+        if handle.is_null() {
+            continue;
+        }
+
+        if next == CF_BITMAP as u32 {
+            let copied = unsafe {
+                CopyImage(handle, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION)
+            };
+            if copied.is_null() {
+                continue;
+            }
+            formats.push(ClipboardFormatData {
+                format: next,
+                kind: ClipboardDataKind::Bitmap(copied as isize),
+            });
+            continue;
+        }
+
+        let size = unsafe { GlobalSize(handle as _) };
+        if size == 0 {
+            continue;
+        }
+
+        let ptr = unsafe { GlobalLock(handle as _) };
+        if ptr.is_null() {
+            continue;
+        }
+
+        let bytes = unsafe {
+            std::slice::from_raw_parts(ptr as *const u8, size)
+        };
+        formats.push(ClipboardFormatData {
+            format: next,
+            kind: ClipboardDataKind::Memory(bytes.to_vec()),
+        });
+
+        unsafe {
+            GlobalUnlock(handle as _);
+        }
+    }
+
+    Some(ClipboardSnapshot { formats })
+}
+
+#[cfg(target_os = "windows")]
+pub fn restore_clipboard_snapshot(snapshot: &ClipboardSnapshot) -> Result<(), String> {
+    if !open_clipboard_with_retry(6, 10) {
+        return Err("failed to open clipboard for restore".to_string());
+    }
+    let _guard = ClipboardOpenGuard;
+
+    unsafe {
+        if EmptyClipboard() == 0 {
+            return Err("failed to empty clipboard".to_string());
+        }
+    }
+
+    for entry in &snapshot.formats {
+        match &entry.kind {
+            ClipboardDataKind::Memory(data) => {
+                let handle = unsafe {
+                    GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, data.len())
+                };
+                if handle.is_null() {
+                    eprintln!(
+                        "[QuickPaste] restore_clipboard_snapshot: GlobalAlloc failed for format {}",
+                        entry.format
+                    );
+                    continue;
+                }
+
+                let ptr = unsafe { GlobalLock(handle) };
+                if ptr.is_null() {
+                    eprintln!(
+                        "[QuickPaste] restore_clipboard_snapshot: GlobalLock failed for format {}",
+                        entry.format
+                    );
+                    unsafe {
+                        GlobalFree(handle);
+                    }
+                    continue;
+                }
+
+                unsafe {
+                    std::ptr::copy_nonoverlapping(
+                        data.as_ptr(),
+                        ptr as *mut u8,
+                        data.len(),
+                    );
+                    GlobalUnlock(handle);
+                }
+
+                let result = unsafe { SetClipboardData(entry.format, handle) };
+                if result.is_null() {
+                    eprintln!(
+                        "[QuickPaste] restore_clipboard_snapshot: SetClipboardData failed for format {}",
+                        entry.format
+                    );
+                    unsafe {
+                        GlobalFree(handle);
+                    }
+                }
+            }
+            ClipboardDataKind::Bitmap(handle) => {
+                let copied = *handle as _;
+                let result = unsafe { SetClipboardData(entry.format, copied) };
+                if result.is_null() {
+                    eprintln!(
+                        "[QuickPaste] restore_clipboard_snapshot: SetClipboardData failed for bitmap format {}",
+                        entry.format
+                    );
+                    unsafe {
+                        DeleteObject(copied as _);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(not(target_os = "windows"))]
 pub fn get_foreground_window() -> isize {
     let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok() || 
@@ -115,31 +336,18 @@ pub fn restore_focus_and_paste(hwnd_val: isize) -> bool {
         release_all_modifiers();
         thread::sleep(Duration::from_millis(50));
 
-        // Step 2: Attach thread inputs to allow SetFocus and synchronised inputs
-        let current_thread = GetCurrentThreadId();
-        let target_thread = GetWindowThreadProcessId(hwnd, std::ptr::null_mut());
-
-        let mut attached = false;
-        if current_thread != target_thread {
-            if AttachThreadInput(current_thread, target_thread, 1) == 0 {
-                eprintln!("[QuickPaste] restore_focus_and_paste: AttachThreadInput failed");
-            } else {
-                attached = true;
-            }
-        }
-
         // Restore window if minimized
         if IsIconic(hwnd) != 0 {
-            ShowWindow(hwnd, SW_RESTORE);
+            ShowWindowAsync(hwnd, SW_RESTORE);
             thread::sleep(Duration::from_millis(50));
         }
 
         // Try to bring to foreground with retries
         let mut success_fg = false;
-        for _ in 0..3 {
+        for _ in 0..4 {
             SetForegroundWindow(hwnd);
             BringWindowToTop(hwnd);
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(90));
             if GetForegroundWindow() == hwnd {
                 success_fg = true;
                 break;
@@ -150,16 +358,11 @@ pub fn restore_focus_and_paste(hwnd_val: isize) -> bool {
             eprintln!("[QuickPaste] restore_focus_and_paste: couldn't bring hwnd to foreground");
         }
 
-        // Step 3: Wait for focus to settle while attached
-        thread::sleep(Duration::from_millis(150));
+        // Step 3: Wait for focus to settle before injecting Ctrl+V
+        thread::sleep(Duration::from_millis(220));
 
         // Step 4: Inject Ctrl+V
         let paste_ok = send_ctrl_v();
-
-        // Step 5: Clean up and detach thread input
-        if attached {
-            AttachThreadInput(current_thread, target_thread, 0);
-        }
 
         paste_ok
     }

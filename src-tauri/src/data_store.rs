@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::fs;
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Snippet {
@@ -110,6 +110,69 @@ pub fn get_settings_path() -> PathBuf {
     p
 }
 
+fn sidecar_path(path: &PathBuf, suffix: &str) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| "data.json".to_string());
+    let mut sidecar = path.clone();
+    sidecar.set_file_name(format!("{}.{}", file_name, suffix));
+    sidecar
+}
+
+fn backup_path(path: &PathBuf) -> PathBuf {
+    sidecar_path(path, "bak")
+}
+
+fn temp_path(path: &PathBuf) -> PathBuf {
+    sidecar_path(path, "tmp")
+}
+
+fn corrupt_archive_path(path: &PathBuf) -> PathBuf {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let file_name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| "data.json".to_string());
+    let mut archived = path.clone();
+    archived.set_file_name(format!("{}.corrupted-{}", file_name, stamp));
+    archived
+}
+
+fn write_json_with_backup(path: &PathBuf, content: &str) -> Result<(), String> {
+    let tmp = temp_path(path);
+    fs::write(&tmp, content).map_err(|e| e.to_string())?;
+    if path.exists() {
+        let _ = fs::remove_file(path);
+    }
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        e.to_string()
+    })?;
+    let _ = fs::write(backup_path(path), content);
+    Ok(())
+}
+
+fn archive_corrupt_file(path: &PathBuf) {
+    if !path.exists() {
+        return;
+    }
+    let archived = corrupt_archive_path(path);
+    if archived.exists() {
+        let _ = fs::remove_file(&archived);
+    }
+    if fs::rename(path, &archived).is_err() {
+        let _ = fs::copy(path, &archived);
+    }
+}
+
+fn read_json_file(path: &PathBuf) -> Result<String, String> {
+    fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
 pub fn load_snippets() -> Vec<Snippet> {
     let path = get_snippets_path();
     if !path.exists() {
@@ -136,15 +199,36 @@ pub fn load_snippets() -> Vec<Snippet> {
         return defaults;
     }
 
-    let mut list: Vec<Snippet> = if let Ok(mut file) = File::open(&path) {
-        let mut content = String::new();
-        if file.read_to_string(&mut content).is_ok() {
-            serde_json::from_str(&content).unwrap_or_else(|_| Vec::new())
-        } else {
-            Vec::new()
+    let mut list: Vec<Snippet> = match read_json_file(&path).and_then(|content| {
+        serde_json::from_str::<Vec<Snippet>>(&content).map_err(|e| e.to_string())
+    }) {
+        Ok(items) => items,
+        Err(err) => {
+            eprintln!("[QuickPaste] load_snippets failed to parse {}: {}", path.display(), err);
+            let backup = backup_path(&path);
+            match read_json_file(&backup).and_then(|content| {
+                serde_json::from_str::<Vec<Snippet>>(&content).map_err(|e| e.to_string())
+            }) {
+                Ok(recovered) => {
+                    eprintln!(
+                        "[QuickPaste] load_snippets recovered from backup {}",
+                        backup.display()
+                    );
+                    archive_corrupt_file(&path);
+                    save_snippets(&recovered);
+                    recovered
+                }
+                Err(backup_err) => {
+                    eprintln!(
+                        "[QuickPaste] load_snippets backup recovery failed ({}): {}",
+                        backup.display(),
+                        backup_err
+                    );
+                    archive_corrupt_file(&path);
+                    Vec::new()
+                }
+            }
         }
-    } else {
-        Vec::new()
     };
 
     // Auto-clean old clipboard history
@@ -177,9 +261,7 @@ pub fn load_snippets() -> Vec<Snippet> {
 pub fn save_snippets(snippets: &[Snippet]) {
     let path = get_snippets_path();
     if let Ok(content) = serde_json::to_string_pretty(snippets) {
-        if let Ok(mut file) = File::create(&path) {
-            let _ = file.write_all(content.as_bytes());
-        }
+        let _ = write_json_with_backup(&path, &content);
     }
 }
 
@@ -191,24 +273,43 @@ pub fn load_settings() -> Settings {
         return defaults;
     }
 
-    let mut file = match File::open(&path) {
-        Ok(f) => f,
-        Err(_) => return Settings::default(),
-    };
-    let mut content = String::new();
-    if file.read_to_string(&mut content).is_ok() {
-        serde_json::from_str(&content).unwrap_or_else(|_| Settings::default())
-    } else {
-        Settings::default()
+    match read_json_file(&path).and_then(|content| {
+        serde_json::from_str(&content).map_err(|e| e.to_string())
+    }) {
+        Ok(settings) => settings,
+        Err(err) => {
+            eprintln!("[QuickPaste] load_settings failed to parse {}: {}", path.display(), err);
+            let backup = backup_path(&path);
+            match read_json_file(&backup).and_then(|content| {
+                serde_json::from_str::<Settings>(&content).map_err(|e| e.to_string())
+            }) {
+                Ok(recovered) => {
+                    eprintln!(
+                        "[QuickPaste] load_settings recovered from backup {}",
+                        backup.display()
+                    );
+                    archive_corrupt_file(&path);
+                    save_settings(&recovered);
+                    recovered
+                }
+                Err(backup_err) => {
+                    eprintln!(
+                        "[QuickPaste] load_settings backup recovery failed ({}): {}",
+                        backup.display(),
+                        backup_err
+                    );
+                    archive_corrupt_file(&path);
+                    Settings::default()
+                }
+            }
+        }
     }
 }
 
 pub fn save_settings(settings: &Settings) {
     let path = get_settings_path();
     if let Ok(content) = serde_json::to_string_pretty(settings) {
-        if let Ok(mut file) = File::create(&path) {
-            let _ = file.write_all(content.as_bytes());
-        }
+        let _ = write_json_with_backup(&path, &content);
     }
 }
 
@@ -217,10 +318,25 @@ mod tests {
     use super::*;
     use std::env;
     use std::fs;
+    use std::sync::{Mutex, OnceLock};
+
+    fn test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn test_temp_dir(name: &str) -> std::path::PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        env::temp_dir().join(format!("quickpaste_test_{}_{}_{}", name, std::process::id(), stamp))
+    }
 
     #[test]
     fn save_and_load_snippets_roundtrip() {
-        let tmp = env::temp_dir().join(format!("quickpaste_test_{}", std::process::id()));
+        let _guard = test_lock().lock().unwrap();
+        let tmp = test_temp_dir("snippets_roundtrip");
         env::set_var("QUICKPASTE_APP_DIR", &tmp);
         if tmp.exists() { let _ = fs::remove_dir_all(&tmp); }
 
@@ -253,7 +369,8 @@ mod tests {
 
     #[test]
     fn save_and_load_settings_roundtrip() {
-        let tmp = env::temp_dir().join(format!("quickpaste_test_{}", std::process::id()));
+        let _guard = test_lock().lock().unwrap();
+        let tmp = test_temp_dir("settings_roundtrip");
         env::set_var("QUICKPASTE_APP_DIR", &tmp);
         if tmp.exists() { let _ = fs::remove_dir_all(&tmp); }
 
@@ -264,6 +381,66 @@ mod tests {
         let loaded = load_settings();
         assert_eq!(loaded.dark_mode, true);
         assert_eq!(loaded.theme, "custom:#112233");
+
+        let _ = fs::remove_dir_all(get_app_dir());
+        env::remove_var("QUICKPASTE_APP_DIR");
+    }
+
+    #[test]
+    fn load_snippets_recovers_from_backup_after_corruption() {
+        let _guard = test_lock().lock().unwrap();
+        let tmp = test_temp_dir("snippets_recover");
+        env::set_var("QUICKPASTE_APP_DIR", &tmp);
+        if tmp.exists() { let _ = fs::remove_dir_all(&tmp); }
+
+        let defaults = vec![Snippet {
+            title: "Recover".to_string(),
+            content: "Backup".to_string(),
+            pinned: false,
+            use_count: 0,
+            category: Some("Test".to_string()),
+            tags: vec![],
+            shortcut: None,
+            is_secret: false,
+            snippet_type: "text".to_string(),
+            color: None,
+            created_at: 0,
+            last_used_at: 0,
+            trigger: None,
+            slot: None,
+            source_app: None,
+        }];
+
+        save_snippets(&defaults);
+        let path = get_snippets_path();
+        fs::write(&path, "{invalid json").unwrap();
+
+        let loaded = load_snippets();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].title, "Recover");
+
+        let _ = fs::remove_dir_all(get_app_dir());
+        env::remove_var("QUICKPASTE_APP_DIR");
+    }
+
+    #[test]
+    fn load_settings_recovers_from_backup_after_corruption() {
+        let _guard = test_lock().lock().unwrap();
+        let tmp = test_temp_dir("settings_recover");
+        env::set_var("QUICKPASTE_APP_DIR", &tmp);
+        if tmp.exists() { let _ = fs::remove_dir_all(&tmp); }
+
+        let mut settings = Settings::default();
+        settings.dark_mode = true;
+        settings.theme = "custom:#334455".to_string();
+        save_settings(&settings);
+
+        let path = get_settings_path();
+        fs::write(&path, "{invalid json").unwrap();
+
+        let loaded = load_settings();
+        assert_eq!(loaded.dark_mode, true);
+        assert_eq!(loaded.theme, "custom:#334455");
 
         let _ = fs::remove_dir_all(get_app_dir());
         env::remove_var("QUICKPASTE_APP_DIR");
