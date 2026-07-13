@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self, File};
+use std::io::Write;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Snippet {
+    #[serde(default)]
+    pub id: Option<String>,
     pub title: String,
     pub content: String,
     pub pinned: bool,
@@ -37,6 +40,12 @@ pub struct Snippet {
     /// Optional executable name of the application the snippet was copied from
     #[serde(default)]
     pub source_app: Option<String>,
+    /// Optional custom icon shown by the frontend.
+    #[serde(default)]
+    pub emoji: Option<String>,
+    /// Macro steps executed in sequence.
+    #[serde(default)]
+    pub chain: Vec<String>,
 }
 
 fn default_snippet_type() -> String {
@@ -164,8 +173,17 @@ fn write_json_with_backup(path: &PathBuf, content: &str) -> Result<(), String> {
     let tmp = temp_path(path);
     let backup = backup_path(path);
 
-    fs::write(&tmp, content)
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Could not create data directory: {e}"))?;
+    }
+    let mut file = File::create(&tmp)
+        .map_err(|e| format!("Could not create temporary data file: {e}"))?;
+    file.write_all(content.as_bytes())
         .map_err(|e| format!("Could not write temporary data file: {e}"))?;
+    file.sync_all()
+        .map_err(|e| format!("Could not flush temporary data file: {e}"))?;
+    drop(file);
 
     if path.exists() {
         fs::copy(path, &backup)
@@ -224,6 +242,9 @@ pub fn load_snippets() -> Vec<Snippet> {
                 trigger: None,
                 slot: None,
                 source_app: None,
+                id: None,
+                emoji: None,
+                chain: Vec::new(),
             }
         ];
         save_snippets(&defaults);
@@ -289,7 +310,26 @@ pub fn load_snippets() -> Vec<Snippet> {
     list
 }
 
+pub fn validate_snippets(snippets: &[Snippet]) -> Result<(), String> {
+    if snippets.len() > 100_000 {
+        return Err("Snippet limit exceeded".to_string());
+    }
+    for snippet in snippets {
+        if snippet.title.trim().is_empty() || snippet.content.is_empty() {
+            return Err("Snippet title and content are required".to_string());
+        }
+        if snippet.title.chars().count() > 200 || snippet.content.len() > 1_000_000 {
+            return Err("Snippet field size limit exceeded".to_string());
+        }
+        if snippet.slot.is_some_and(|slot| !(1..=9).contains(&slot)) {
+            return Err("Favorite slot must be between 1 and 9".to_string());
+        }
+    }
+    Ok(())
+}
+
 pub fn save_snippets(snippets: &[Snippet]) -> Result<(), String> {
+    validate_snippets(snippets)?;
     let path = get_snippets_path();
     let content = serde_json::to_string_pretty(snippets)
         .map_err(|e| format!("Could not serialize snippets: {e}"))?;
@@ -373,6 +413,9 @@ mod tests {
             trigger: None,
             slot: None,
             source_app: None,
+            id: None,
+            emoji: None,
+            chain: Vec::new(),
         }];
 
         save_snippets(&defaults);
@@ -426,6 +469,9 @@ mod tests {
             trigger: None,
             slot: None,
             source_app: None,
+            id: None,
+            emoji: None,
+            chain: Vec::new(),
         }];
 
         save_snippets(&defaults);

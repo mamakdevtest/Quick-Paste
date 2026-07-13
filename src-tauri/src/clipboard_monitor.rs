@@ -112,6 +112,9 @@ unsafe extern "system" fn clipboard_wnd_proc(
             0
         }
         WM_DESTROY => {
+            if let Ok(mut handle) = MONITOR_HWND.lock() {
+                *handle = 0;
+            }
             PostQuitMessage(0);
             0
         }
@@ -149,12 +152,16 @@ impl ClipboardMonitor {
             }
         }
 
-        thread::spawn(|| {
+        let running = Arc::clone(&self.running);
+        thread::spawn(move || {
             use windows_sys::Win32::UI::WindowsAndMessaging::{
-                RegisterClassW, CreateWindowExW, GetMessageW, MSG, WNDCLASSW
+                RegisterClassW, CreateWindowExW, DestroyWindow, GetMessageW, MSG, WNDCLASSW
             };
 
             unsafe {
+                if !running.load(Ordering::SeqCst) {
+                    return;
+                }
                 let class_name: Vec<u16> = "QuickPasteClipboardMonitorClass\0".encode_utf16().collect();
                 let wnd_class = WNDCLASSW {
                     style: 0,
@@ -188,7 +195,15 @@ impl ClipboardMonitor {
                     if let Ok(mut hw_guard) = MONITOR_HWND.lock() {
                         *hw_guard = hwnd as isize;
                     }
-                    AddClipboardFormatListener(hwnd as isize);
+                    if !running.load(Ordering::SeqCst) {
+                        DestroyWindow(hwnd);
+                        return;
+                    }
+                    if AddClipboardFormatListener(hwnd as isize) == 0 {
+                        running.store(false, Ordering::SeqCst);
+                        DestroyWindow(hwnd);
+                        return;
+                    }
                     
                     let mut msg: MSG = std::mem::zeroed();
                     while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {

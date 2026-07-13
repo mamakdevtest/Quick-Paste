@@ -14,11 +14,13 @@ import {
   executeChain,
 } from '/features.js';
 import { setupTextExpansionPanel } from '/text-expansion-panel.js';
+import { createTauriGateway, userError } from '/app/tauri-gateway.js';
+import { normalizeSettings, normalizeSnippet, normalizeSnippets, validateSnippet } from '/app/models.js';
 
-const { invoke } = window.__TAURI__.core;
-const { listen }  = window.__TAURI__.event;
-const { getCurrentWindow } = window.__TAURI__.window;
-const appWindow = getCurrentWindow();
+const tauri = createTauriGateway();
+const invoke = tauri.invoke;
+const listen = tauri.listen;
+const appWindow = tauri.window;
 
 // ─── Window Size Constants ──────────────────────────────────────────────────────
 const WIN_BASE_WIDTH  = 410;  // default window width
@@ -36,7 +38,7 @@ let appSettings      = {};
 let settingsOpen     = false;
 let sortMode         = 'default';
 let multiSelectMode  = false;
-  let selectedSnippets = new Set(); // stable indices into the source snippets array
+let selectedSnippets = new Set(); // stable snippet ids
 let activeProcessName = null; // current foreground app name for context-aware sort
 let currentThemeId   = 'violet'; // active theme id
 let dashboardOpen    = false; // global state for dashboard visibility
@@ -226,7 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  appSettings = await invoke('load_settings');
+  appSettings = normalizeSettings(await invoke('load_settings', undefined, { previewValue: {} }));
   window.addEventListener('settings-updated', (event) => {
     if (event?.detail && typeof event.detail === 'object') {
       appSettings = event.detail;
@@ -349,22 +351,31 @@ function applySettings(settings) {
 
 async function saveCurrentSettings() {
   const historyDurationInput = document.getElementById('historyDurationInput');
-  appSettings = {
+  const previous = appSettings;
+  const next = normalizeSettings({
     ...appSettings,
     dark_mode: darkModeToggle.checked,
     auto_paste: autoPasteToggle.checked,
     clipboard_history_enabled: clipboardHistoryToggle.checked,
-    clipboard_history_duration_days: parseInt(historyDurationInput.value, 10),
+    clipboard_history_duration_days: Math.max(1, parseInt(historyDurationInput.value, 10) || 30),
     theme: currentThemeId,
     text_expansion_show_welcome_on_startup: false,
-  };
-  await invoke('save_settings', { settings: appSettings });
-  window.dispatchEvent(new CustomEvent('settings-updated', { detail: appSettings }));
-  document.body.classList.toggle('dark', appSettings.dark_mode);
-  document.documentElement.classList.toggle('dark', appSettings.dark_mode);
-  document.body.classList.toggle('light', !appSettings.dark_mode);
-  document.documentElement.classList.toggle('light', !appSettings.dark_mode);
-  applyTheme(currentThemeId, appSettings.dark_mode);
+  });
+  try {
+    await tauri.mutate('settings', 'save_settings', { settings: next });
+    appSettings = next;
+    window.dispatchEvent(new CustomEvent('settings-updated', { detail: appSettings }));
+    document.body.classList.toggle('dark', appSettings.dark_mode);
+    document.documentElement.classList.toggle('dark', appSettings.dark_mode);
+    document.body.classList.toggle('light', !appSettings.dark_mode);
+    document.documentElement.classList.toggle('light', !appSettings.dark_mode);
+    applyTheme(currentThemeId, appSettings.dark_mode);
+  } catch (error) {
+    appSettings = previous;
+    applySettings(previous);
+    showToast(userError(error, 'Settings could not be saved.'), 2200, 'error');
+    throw error;
+  }
 }
 
 
@@ -409,7 +420,10 @@ function setupHotkeyCapture() {
 
 // ─── Data Loading & Displaying ─────────────────────────────────────────────────
 async function reloadData() {
-  snippets = await invoke('load_snippets');
+  const loaded = await invoke('load_snippets', undefined, { previewValue: [] });
+  snippets = normalizeSnippets(loaded);
+  const validIds = new Set(snippets.map((snippet) => snippet.id));
+  selectedSnippets = new Set([...selectedSnippets].filter((id) => validIds.has(id)));
   refreshCategoryFilter();
   loadAndDisplay();
   checkAutoPromote(snippets, showToast, (s) => {
@@ -526,7 +540,7 @@ function loadAndDisplay() {
   filteredSnippets.forEach((item, index) => {
     const s = item.s;
     const card = document.createElement('div');
-    card.className = `snippet-card ${s.pinned ? 'pinned-card' : ''} ${index === selectedIndex ? 'selected-card' : ''} ${multiSelectMode && selectedSnippets.has(item.i) ? 'multi-selected' : ''}`;
+    card.className = `snippet-card ${s.pinned ? 'pinned-card' : ''} ${index === selectedIndex ? 'selected-card' : ''} ${multiSelectMode && selectedSnippets.has(s.id) ? 'multi-selected' : ''}`;
     card.draggable = !multiSelectMode;
 
     // Color label border
@@ -574,7 +588,7 @@ function loadAndDisplay() {
     const secretLock = s.is_secret ? `<span class="secret-lock" title="Secret">🔒</span>` : '';
     const charBadge  = `<span class="char-badge" title="Content length">${formatCharCount(s.content.length)}</span>`;
     const timeAgoStr = s.last_used_at ? `<span class="time-ago" title="Last used">${timeAgo(s.last_used_at)}</span>` : (s.created_at ? `<span class="time-ago" title="Created">${timeAgo(s.created_at)}</span>` : '');
-    const multiCheckbox = multiSelectMode ? `<span class="multi-check" aria-hidden="true">${selectedSnippets.has(item.i) ? 'Selected' : ''}</span>` : '';
+    const multiCheckbox = multiSelectMode ? `<span class="multi-check" aria-hidden="true">${selectedSnippets.has(s.id) ? 'Selected' : ''}</span>` : '';
 
     // Content preview: masked if secret
     const previewText  = s.is_secret ? '••••••••••••' : highlightText(escapeHtml(s.content), queryLower);
@@ -695,10 +709,10 @@ function loadAndDisplay() {
     // Multi-select click
     if (multiSelectMode) {
       card.addEventListener('click', () => {
-        if (selectedSnippets.has(item.i)) {
-          selectedSnippets.delete(item.i);
+        if (selectedSnippets.has(s.id)) {
+          selectedSnippets.delete(s.id);
         } else {
-          selectedSnippets.add(item.i);
+          selectedSnippets.add(s.id);
         }
         updateBulkBar();
         loadAndDisplay();
@@ -822,17 +836,16 @@ bulkDeleteBtn.addEventListener('click', async () => {
   if (selectedSnippets.size === 0) return;
   if (!confirm(`Delete ${selectedSnippets.size} snippet(s)?`)) return;
 
-  const actualIndices = [...selectedSnippets]
-    .filter(index => Number.isInteger(index) && index >= 0 && index < snippets.length)
-    .sort((a, b) => b - a);
-  for (const idx of actualIndices) {
-    snippets.splice(idx, 1);
-  }
+  const selectedIds = new Set(selectedSnippets);
+  const previous = snippets;
+  snippets = snippets.filter((snippet) => !selectedIds.has(snippet.id));
+  const deletedCount = previous.length - snippets.length;
   try {
-    await invoke('save_snippets', { snippets });
+    await tauri.mutate('snippets', 'save_snippets', { snippets });
   } catch (error) {
-    await reloadData();
-    showToast(`Delete failed: ${String(error)}`, 2400, 'error');
+    snippets = previous;
+    loadAndDisplay();
+    showToast(userError(error, 'Snippets could not be deleted.'), 2400, 'error');
     return;
   }
   selectedSnippets.clear();
@@ -840,7 +853,7 @@ bulkDeleteBtn.addEventListener('click', async () => {
   multiSelectBtn.classList.remove('active');
   bulkActionBar.classList.add('hidden');
   reloadData();
-  showToast(`${actualIndices.length} snippet(s) deleted`, 1600);
+  showToast(`${deletedCount} snippet(s) deleted`, 1600);
 });
 
 // ─── Selection & AutoPaste ─────────────────────────────────────────────────────
@@ -1013,7 +1026,7 @@ categoryFilter.addEventListener('change', () => {
   loadAndDisplay();
 });
 
-// ─── Clipboard Import ─────────────────────────────────────────────────────────
+// ─── Clipboard Import ─────────────────────���───────────────────────────────────
 clipboardImportBtn.addEventListener('click', async () => {
   try {
     const text = await navigator.clipboard.readText();
@@ -1238,9 +1251,15 @@ function scrollToSelected() {
 // ─── Settings Toggles ─────────────────────────────────────────────────────────
 autoPasteToggle.addEventListener('change', saveCurrentSettings);
 darkModeToggle.addEventListener('change', saveCurrentSettings);
-clipboardHistoryToggle.addEventListener('change', () => {
-  saveCurrentSettings();
-  invoke('toggle_clipboard_monitor', { enabled: clipboardHistoryToggle.checked });
+clipboardHistoryToggle.addEventListener('change', async () => {
+  const enabled = clipboardHistoryToggle.checked;
+  try {
+    await saveCurrentSettings();
+    await invoke('toggle_clipboard_monitor', { enabled });
+  } catch (error) {
+    clipboardHistoryToggle.checked = !enabled;
+    showToast(userError(error, 'Clipboard monitoring could not be changed.'), 2200, 'error');
+  }
 });
 
 startupToggle.addEventListener('change', async () => {
@@ -1291,11 +1310,18 @@ importBtn.addEventListener('click', async () => {
 
 clearBtn.addEventListener('click', async () => {
   if (!confirm('Clear all snippets and reset settings? This cannot be undone.')) return;
-  await invoke('clear_all_data');
-  appSettings = await invoke('load_settings');
-  applySettings(appSettings);
-  await reloadData();
-  showToast('All data cleared.');
+  clearBtn.disabled = true;
+  try {
+    await tauri.mutate('all-data', 'clear_all_data');
+    appSettings = normalizeSettings(await invoke('load_settings', undefined, { previewValue: {} }));
+    applySettings(appSettings);
+    await reloadData();
+    showToast('All data cleared.', 1600, 'success');
+  } catch (error) {
+    showToast(userError(error, 'Data could not be cleared.'), 2400, 'error');
+  } finally {
+    clearBtn.disabled = false;
+  }
 });
 
 // ─── Add / Edit Snippet Dialog ────────────────────────────────────────────────
@@ -1352,28 +1378,42 @@ dialogSaveBtn.addEventListener('click', async () => {
   }
 
   const now = Date.now();
-  if (editIndex >= 0) {
-    snippets[editIndex] = {
-      ...snippets[editIndex],
-      title, content, category, tags, shortcut,
-      is_secret, snippet_type, color, trigger, slot, emoji, chain,
-    };
-  } else {
-    snippets.push({
-      title, content,
-      pinned: false, use_count: 0,
-      category, tags, shortcut,
-      is_secret, snippet_type, color,
-      created_at: now,
-      last_used_at: 0,
-      trigger, slot, emoji, chain,
-    });
+  const wasEditing = editIndex >= 0;
+  const candidate = normalizeSnippet(wasEditing ? {
+    ...snippets[editIndex],
+    title, content, category, tags, shortcut,
+    is_secret, snippet_type, color, trigger, slot, emoji, chain,
+  } : {
+    title, content,
+    pinned: false, use_count: 0,
+    category, tags, shortcut,
+    is_secret, snippet_type, color,
+    created_at: now,
+    last_used_at: 0,
+    trigger, slot, emoji, chain,
+  }, wasEditing ? editIndex : snippets.length);
+  const validationErrors = validateSnippet(candidate);
+  if (validationErrors.length > 0) {
+    showToast(validationErrors[0], 1800, 'error');
+    return;
   }
 
-  await invoke('save_snippets', { snippets });
-  closeDialog();
-  reloadData();
-  showToast(editIndex >= 0 ? 'Snippet updated!' : 'Snippet added!', 1400, 'success');
+  const previous = snippets;
+  snippets = wasEditing
+    ? snippets.map((snippet, index) => index === editIndex ? candidate : snippet)
+    : [...snippets, candidate];
+  dialogSaveBtn.disabled = true;
+  try {
+    await tauri.mutate('snippets', 'save_snippets', { snippets });
+    closeDialog();
+    await reloadData();
+    showToast(wasEditing ? 'Snippet updated!' : 'Snippet added!', 1400, 'success');
+  } catch (error) {
+    snippets = previous;
+    showToast(userError(error, 'Snippet could not be saved.'), 2200, 'error');
+  } finally {
+    dialogSaveBtn.disabled = false;
+  }
 });
 
 // ─── Shortcut Capture ─────────────────────────────────────────────────────────

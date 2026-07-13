@@ -8,6 +8,8 @@
     "tauri:dev": "tauri dev",
     "tauri:clean": "cargo clean --manifest-path src-tauri/Cargo.toml",
     "tauri:dev:fresh": "npm run tauri:clean && tauri dev",
+    "test": "node --test tests/*.test.js",
+    "check": "npm test && node --check src/main.js && node --check src/text-expansion-panel.js && node --check src/welcome.js && node --check src/suggestions.js",
     "css:build": "src\\assets\\tailwindcss.exe -c tailwind.config.js -i src/assets/tailwind.input.css -o src/assets/tailwind.css --minify",
     "css:watch": "src\\assets\\tailwindcss.exe -c tailwind.config.js -i src/assets/tailwind.input.css -o src/assets/tailwind.css --watch"
   },

@@ -1277,6 +1277,9 @@ mod tests {
             trigger: Some(":mail".to_string()),
             slot: None,
             source_app: None,
+            id: None,
+            emoji: None,
+            chain: Vec::new(),
         }];
         let items = legacy_from_snippets(&snippets);
         assert_eq!(items.len(), 1);
