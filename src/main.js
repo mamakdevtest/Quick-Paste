@@ -149,8 +149,11 @@ async function setWelcomeWindowMode(enabled) {
 
 function applyResponsiveLayoutMode() {
   const width = window.innerWidth || document.documentElement.clientWidth || WIN_BASE_WIDTH;
-  document.body.classList.toggle('qp-compact', width <= 900);
-  document.body.classList.toggle('qp-narrow', width <= 640);
+  // qp-compact: multi-column editor/stat grids collapse and toolbars wrap.
+  // qp-narrow: toolbars stack into a single vertical column (tiny launcher).
+  // Kept low so horizontal layouts persist for any comfortably sized window.
+  document.body.classList.toggle('qp-compact', width <= 560);
+  document.body.classList.toggle('qp-narrow', width <= 400);
 }
 
 // Settings UI
