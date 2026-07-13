@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:clean": "cargo clean --manifest-path src-tauri/Cargo.toml",
+    "tauri:dev:fresh": "npm run tauri:clean && tauri dev",
     "css:build": "src\\assets\\tailwindcss.exe -c tailwind.config.js -i src/assets/tailwind.input.css -o src/assets/tailwind.css --minify",
     "css:watch": "src\\assets\\tailwindcss.exe -c tailwind.config.js -i src/assets/tailwind.input.css -o src/assets/tailwind.css --watch"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "2.11.5"
+    "@tauri-apps/cli": "2.11.4"
   }
 }
