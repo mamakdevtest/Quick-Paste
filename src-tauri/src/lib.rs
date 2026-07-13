@@ -210,14 +210,29 @@ fn load_snippets() -> Vec<Snippet> {
 #[tauri::command]
 fn save_snippets(app: AppHandle, snippets: Vec<Snippet>) -> Result<(), String> {
     let previous = data_store::load_snippets();
+    let previous_expansions = text_expansion::current_snapshot();
+    let next_expansions = text_expansion::reconcile_snippets(
+        &previous_expansions,
+        &previous,
+        &snippets,
+    )?;
+
     data_store::save_snippets(&snippets)?;
+    if let Err(error) = text_expansion::save_text_expansions(&next_expansions) {
+        data_store::save_snippets(&previous)?;
+        return Err(error);
+    }
     if let Err(error) = reregister_all_shortcuts(&app) {
         data_store::save_snippets(&previous)?;
+        text_expansion::save_text_expansions(&previous_expansions)?;
         let _ = reregister_all_shortcuts(&app);
         return Err(error);
     }
     app.emit("snippets-updated", ())
-        .map_err(|e| format!("Snippets were saved but the UI could not be notified: {e}"))
+        .map_err(|e| format!("Snippets were saved but the UI could not be notified: {e}"))?;
+    app.emit("text-expansions-updated", ())
+        .map_err(|e| format!("Snippet was saved but expansion UI could not be notified: {e}"))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -246,7 +261,8 @@ fn load_text_expansion_catalog(locale: Option<String>) -> text_expansion::TextEx
 #[tauri::command]
 fn save_text_expansions(app: AppHandle, items: Vec<TextExpansion>) -> Result<Vec<TextExpansion>, String> {
     let saved = text_expansion::save_text_expansions(&items)?;
-    let _ = app.emit("text-expansions-updated", ());
+    app.emit("text-expansions-updated", ())
+        .map_err(|e| format!("Expansions saved but UI could not be notified: {e}"))?;
     Ok(saved)
 }
 
@@ -271,7 +287,12 @@ fn export_text_expansions(locale: Option<String>) -> Result<bool, String> {
 
     let items = text_expansion::current_snapshot();
     let out = text_expansion::export_payload(&items)?;
-    fs::write(&path, out).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension("json.tmp");
+    fs::write(&temporary, out).map_err(|e| e.to_string())?;
+    if path.exists() {
+        fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+    fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
     Ok(true)
 }
 
@@ -293,16 +314,25 @@ fn import_text_expansions(app: AppHandle, locale: Option<String>) -> Result<Opti
         return Ok(None);
     };
 
+    let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
+    if metadata.len() > 50 * 1024 * 1024 {
+        return Err("Text expansion import is larger than 50 MB".to_string());
+    }
     let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let imported = text_expansion::import_payload(&raw)?;
-    let _ = app.emit("text-expansions-updated", ());
-    Ok(Some(imported))
+    let imported = text_expansion::parse_import_payload(&raw)?;
+    let snippets = data_store::load_snippets();
+    let reconciled = text_expansion::reconcile_snippets(&imported, &snippets, &snippets)?;
+    let saved = text_expansion::save_text_expansions(&reconciled)?;
+    app.emit("text-expansions-updated", ())
+        .map_err(|e| format!("Expansions imported but UI could not be notified: {e}"))?;
+    Ok(Some(saved))
 }
 
 #[tauri::command]
 fn reset_text_expansions(app: AppHandle) -> Result<Vec<TextExpansion>, String> {
     let items = text_expansion::reset_text_expansions()?;
-    let _ = app.emit("text-expansions-updated", ());
+    app.emit("text-expansions-updated", ())
+        .map_err(|e| format!("Expansions reset but UI could not be notified: {e}"))?;
     Ok(items)
 }
 

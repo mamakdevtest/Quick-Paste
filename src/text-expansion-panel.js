@@ -943,8 +943,9 @@ export function setupTextExpansionPanel({
       enabled: enabledToggle.checked,
       caseSensitive: caseSensitiveToggle.checked,
       wordBoundary: wordBoundaryToggle.checked,
-      appFilter: resolveAppFilterFromForm(),
-      createdAt,
+    appFilter: resolveAppFilterFromForm(),
+    sourceSnippetId: existing?.sourceSnippetId || null,
+    createdAt,
       updatedAt: now,
     };
   }
@@ -1153,6 +1154,10 @@ export function setupTextExpansionPanel({
       return;
     }
     const existing = expansions.find((item) => item.id === editingId) || null;
+    if (existing?.sourceSnippetId) {
+      showToast('This expansion is managed by its snippet. Edit the snippet instead.', 2200, 'info');
+      return;
+    }
     const payload = normalizeFormPayload(existing);
     if (!payload.trigger) {
       showToast(ui.errorTriggerRequired, 1600, 'error');
@@ -1213,6 +1218,10 @@ export function setupTextExpansionPanel({
     const item = expansions.find((entry) => entry.id === editingId);
     if (!item) {
       clearForm();
+      return;
+    }
+    if (item.sourceSnippetId) {
+      showToast('This expansion is managed by its snippet. Delete or edit the snippet instead.', 2400, 'info');
       return;
     }
 

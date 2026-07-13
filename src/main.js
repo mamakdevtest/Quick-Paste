@@ -1008,7 +1008,7 @@ if (openSettingsBtn) {
 
 closeBtn.addEventListener('click', () => appWindow.hide());
 
-// ─── Sort ─────────────────────────────────────────────────────────────────────
+// ─── Sort ───────────────────────────────────────────────��─────────────────────
 sortSelect.addEventListener('change', () => {
   sortMode = sortSelect.value;
   selectedIndex = -1;
@@ -1406,7 +1406,18 @@ dialogSaveBtn.addEventListener('click', async () => {
   try {
     await tauri.mutate('snippets', 'save_snippets', { snippets });
     closeDialog();
+    if (!wasEditing) {
+      searchInput.value = '';
+      categoryFilter.value = 'All';
+      sortMode = 'newest';
+      sortSelect.value = 'newest';
+    }
     await reloadData();
+    const savedIndex = filteredSnippets.findIndex(({ s }) => s.id === candidate.id);
+    if (savedIndex >= 0) {
+      selectItem(savedIndex);
+      listContainer.children[savedIndex]?.scrollIntoView({ block: 'nearest' });
+    }
     showToast(wasEditing ? 'Snippet updated!' : 'Snippet added!', 1400, 'success');
   } catch (error) {
     snippets = previous;
