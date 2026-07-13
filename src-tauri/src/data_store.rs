@@ -79,7 +79,7 @@ pub struct Settings {
 }
 
 fn default_theme() -> String {
-    "violet".to_string()
+    "teal".to_string()
 }
 
 fn default_history_days() -> u32 {
@@ -89,7 +89,7 @@ fn default_history_days() -> u32 {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            dark_mode: false,
+            dark_mode: true,
             auto_paste: true,
             clipboard_history_enabled: false,
             startup_with_os: false,

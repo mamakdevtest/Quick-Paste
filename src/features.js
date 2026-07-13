@@ -188,7 +188,7 @@ export function fuzzyFilter(snippets, query) {
   return scored.map(x => x.item);
 }
 
-// ─── Inline Expression Evaluator ─────────────────────────────────────────────
+// ─── Inline Expression Evaluator ───────────────────────���─────────────────────
 
 export function processInlineExpressions(text) {
   // {{= expression }} → evaluate safely
@@ -417,20 +417,20 @@ function buildThemeTokens(accentHex, isDark) {
         info: '#69a9df',
       }
     : {
-        window: 'rgba(255,255,255,0.88)',
-        bg: '#f6f0f8',
+        window: 'rgba(255,255,255,0.9)',
+        bg: '#eef1f4',
         surface: '#ffffff',
-        surface2: '#f2ecf4',
-        surface3: '#e6e0e9',
-        border: '#cbc4d2',
-        borderStrong: '#aba2b6',
-        text: '#1d1b20',
-        muted: '#605d66',
-        mutedSoft: '#7d7884',
-        outline: '#7d7884',
-        outlineVariant: '#cbc4d2',
-        shadow: 'rgba(29,27,32,0.18)',
-        overlay: 'rgba(29,27,32,0.45)',
+        surface2: '#f3f5f8',
+        surface3: '#e4e8ed',
+        border: '#d3d9e0',
+        borderStrong: '#b3bcc7',
+        text: '#1a2028',
+        muted: '#5c6875',
+        mutedSoft: '#7a8592',
+        outline: '#7a8592',
+        outlineVariant: '#d3d9e0',
+        shadow: 'rgba(20,28,38,0.16)',
+        overlay: 'rgba(20,28,38,0.42)',
         accentPrimary: mixHex(accent, '#000000', 0.12),
         accentPrimaryContainer: mixHex(accent, '#ffffff', 0.08),
         accentPrimaryFixed: mixHex(accent, '#ffffff', 0.82),

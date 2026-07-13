@@ -40,7 +40,7 @@ let sortMode         = 'default';
 let multiSelectMode  = false;
 let selectedSnippets = new Set(); // stable snippet ids
 let activeProcessName = null; // current foreground app name for context-aware sort
-let currentThemeId   = 'violet'; // active theme id
+let currentThemeId   = 'teal'; // active theme id
 let dashboardOpen    = false; // global state for dashboard visibility
 let textExpansionPanel = null;
 // Keyboard sequence state for new command-palette shortcut: Alt+Q then W
@@ -322,7 +322,7 @@ function applySettings(settings) {
   document.documentElement.classList.toggle('light', !settings.dark_mode);
 
   // Apply theme
-  const themeId = settings.theme || 'violet';
+  const themeId = settings.theme || 'teal';
   currentThemeId = themeId;
   applyTheme(themeId, !!settings.dark_mode);
   const resolvedTheme = resolveTheme(themeId);
@@ -1008,7 +1008,7 @@ if (openSettingsBtn) {
 
 closeBtn.addEventListener('click', () => appWindow.hide());
 
-// ─── Sort ───────────────────────────────────────────────��─────────────────────
+// ─── Sort ───────────────────────────────────────────────���─────────────────────
 sortSelect.addEventListener('change', () => {
   sortMode = sortSelect.value;
   selectedIndex = -1;
@@ -1415,7 +1415,8 @@ dialogSaveBtn.addEventListener('click', async () => {
     await reloadData();
     const savedIndex = filteredSnippets.findIndex(({ s }) => s.id === candidate.id);
     if (savedIndex >= 0) {
-      selectItem(savedIndex);
+      selectedIndex = savedIndex;
+      loadAndDisplay();
       listContainer.children[savedIndex]?.scrollIntoView({ block: 'nearest' });
     }
     showToast(wasEditing ? 'Snippet updated!' : 'Snippet added!', 1400, 'success');
@@ -1847,7 +1848,7 @@ function promptPlaceholders(placeholders, content, callback) {
     input.type = 'text';
     input.className = 'w-full px-3 py-2 bg-d-input border border-d-border/50 rounded-lg text-sm text-d-text focus:outline-none focus:border-d-primary transition-colors';
     input.dataset.placeholderName = name;
-    input.placeholder = `Enter value for ${name}…`;
+    input.placeholder = `Enter value for ${name}��`;
 
     row.appendChild(label);
     row.appendChild(input);

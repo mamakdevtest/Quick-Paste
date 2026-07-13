@@ -13,6 +13,42 @@
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   MATERIAL SYMBOLS — the icon-font binding formerly lived in the now-disabled
+   inline <style>. Without it every icon renders its ligature word (e.g.
+   "search", "content_paste"), so it is restored here as part of the single
+   source of truth.
+   ═════════════════════════════════════════════════════════════════════════ */
+.material-symbols-outlined{
+  font-family:'Material Symbols Outlined'!important;
+  font-weight:normal;font-style:normal;line-height:1;
+  letter-spacing:normal;text-transform:none;display:inline-block;
+  white-space:nowrap;word-wrap:normal;direction:ltr;
+  -webkit-font-feature-settings:'liga';font-feature-settings:'liga';
+  -webkit-font-smoothing:antialiased;font-variation-settings:'opsz' 24;
+  user-select:none;-webkit-user-select:none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PANEL SLIDER LAYOUT — the four views (list, text-expansion, dashboard,
+   settings) live side-by-side in a 400%-wide flex track that translates on the
+   X axis. This structural layout also came from the disabled inline <style>;
+   without it the panels stack vertically and navigation appears broken.
+   ═════════════════════════════════════════════════════════════════════════ */
+#panelTrack{
+  display:flex!important;flex-direction:row!important;width:400%!important;height:100%!important;
+  transition:transform .28s cubic-bezier(.4,0,.2,1);will-change:transform;
+  backface-visibility:hidden;overflow:hidden;
+}
+#panelTrack.text-expansion-open{transform:translate3d(-25%,0,0)}
+#panelTrack.dashboard-open{transform:translate3d(-50%,0,0)}
+#panelTrack.settings-open{transform:translate3d(-75%,0,0)}
+#bodyArea{flex:1;overflow:hidden}
+#listPanel,#textExpansionScroll,#dashboardScroll,#settingsScroll{
+  flex:0 0 25%!important;width:25%!important;min-width:25%!important;max-width:25%!important;
+  height:100%!important;overflow-y:auto!important;overflow-x:hidden!important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    SEMANTIC UTILITY LAYER — single source of truth for the d-*/l-* classes the
    JS injects at runtime and the markup uses. The prebuilt tailwind.css ships
    stale/hardcoded values (and is missing several of these entirely), so every
