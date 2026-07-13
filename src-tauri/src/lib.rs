@@ -192,8 +192,14 @@ fn load_settings() -> Settings {
 
 #[tauri::command]
 fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
+    let previous = data_store::load_settings();
     data_store::save_settings(&settings)?;
-    reregister_all_shortcuts(&app)
+    if let Err(error) = reregister_all_shortcuts(&app) {
+        data_store::save_settings(&previous)?;
+        let _ = reregister_all_shortcuts(&app);
+        return Err(error);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -203,8 +209,13 @@ fn load_snippets() -> Vec<Snippet> {
 
 #[tauri::command]
 fn save_snippets(app: AppHandle, snippets: Vec<Snippet>) -> Result<(), String> {
+    let previous = data_store::load_snippets();
     data_store::save_snippets(&snippets)?;
-    reregister_all_shortcuts(&app)?;
+    if let Err(error) = reregister_all_shortcuts(&app) {
+        data_store::save_snippets(&previous)?;
+        let _ = reregister_all_shortcuts(&app);
+        return Err(error);
+    }
     app.emit("snippets-updated", ())
         .map_err(|e| format!("Snippets were saved but the UI could not be notified: {e}"))
 }
@@ -428,16 +439,20 @@ fn copy_only(content: String) -> bool {
 }
 
 #[tauri::command]
-fn toggle_clipboard_monitor(app_handle: AppHandle, state: State<'_, AppState>, enabled: bool) {
+fn toggle_clipboard_monitor(app_handle: AppHandle, state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
     let monitor = state.monitor.lock().unwrap_or_else(|e| e.into_inner());
     if enabled {
-        monitor.start(app_handle);
+        monitor.start(app_handle.clone());
     } else {
         monitor.stop();
     }
     let mut settings = data_store::load_settings();
     settings.clipboard_history_enabled = enabled;
-    data_store::save_settings(&settings);
+    if let Err(error) = data_store::save_settings(&settings) {
+        if enabled { monitor.stop(); } else { monitor.start(app_handle); }
+        return Err(error);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -501,18 +516,27 @@ fn import_data(app: AppHandle) -> Result<Option<ImportedData>, String> {
         return Ok(None);
     };
 
+    let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
+    if metadata.len() > 50 * 1024 * 1024 {
+        return Err("Backup file is larger than 50 MB".to_string());
+    }
     let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let bundle: serde_json::Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+    let version = bundle.get("version").and_then(|value| value.as_u64()).unwrap_or(1);
+    if !(1..=2).contains(&version) {
+        return Err(format!("Unsupported backup version: {version}"));
+    }
 
-    let snippets: Vec<Snippet> = bundle
-        .get("snippets")
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
+    let snippets_value = bundle.get("snippets")
+        .ok_or_else(|| "Backup does not contain snippets".to_string())?;
+    let snippets: Vec<Snippet> = serde_json::from_value(snippets_value.clone())
+        .map_err(|e| format!("Invalid snippets in backup: {e}"))?;
+    data_store::validate_snippets(&snippets)?;
 
-    let settings: Settings = bundle
-        .get("settings")
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
+    let settings_value = bundle.get("settings")
+        .ok_or_else(|| "Backup does not contain settings".to_string())?;
+    let settings: Settings = serde_json::from_value(settings_value.clone())
+        .map_err(|e| format!("Invalid settings in backup: {e}"))?;
 
     let text_expansions_from_bundle: Option<Vec<TextExpansion>> = bundle
         .get("text_expansions")
@@ -523,8 +547,8 @@ fn import_data(app: AppHandle) -> Result<Option<ImportedData>, String> {
                 .and_then(|v| serde_json::from_value(v.clone()).ok())
         });
 
-    data_store::save_snippets(&snippets);
-    data_store::save_settings(&settings);
+    data_store::save_snippets(&snippets)?;
+    data_store::save_settings(&settings)?;
 
     let imported_expansions = match text_expansions_from_bundle {
         Some(items) => text_expansion::replace_runtime(items)?,
@@ -534,9 +558,11 @@ fn import_data(app: AppHandle) -> Result<Option<ImportedData>, String> {
         }
     };
 
-    let _ = reregister_all_shortcuts(&app);
-    let _ = app.emit("snippets-updated", ());
-    let _ = app.emit("text-expansions-updated", ());
+    reregister_all_shortcuts(&app)?;
+    app.emit("snippets-updated", ())
+        .map_err(|e| format!("Imported data, but could not notify snippets UI: {e}"))?;
+    app.emit("text-expansions-updated", ())
+        .map_err(|e| format!("Imported data, but could not notify expansion UI: {e}"))?;
 
     Ok(Some(ImportedData {
         snippets,
@@ -553,13 +579,16 @@ struct ImportedData {
 }
 
 #[tauri::command]
-fn clear_all_data(app: AppHandle) {
-    data_store::save_snippets(&[]);
-    data_store::save_settings(&Settings::default());
-    let _ = text_expansion::reset_text_expansions();
-    let _ = reregister_all_shortcuts(&app);
-    let _ = app.emit("snippets-updated", ());
-    let _ = app.emit("text-expansions-updated", ());
+fn clear_all_data(app: AppHandle) -> Result<(), String> {
+    data_store::save_snippets(&[])?;
+    data_store::save_settings(&Settings::default())?;
+    text_expansion::reset_text_expansions()?;
+    reregister_all_shortcuts(&app)?;
+    app.emit("snippets-updated", ())
+        .map_err(|e| format!("Data cleared, but could not notify snippets UI: {e}"))?;
+    app.emit("text-expansions-updated", ())
+        .map_err(|e| format!("Data cleared, but could not notify expansion UI: {e}"))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -596,8 +625,8 @@ fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     // Persist setting
     let mut settings = data_store::load_settings();
     settings.startup_with_os = enabled;
-    data_store::save_settings(&settings);
-    let _ = reregister_all_shortcuts(&app);
+    data_store::save_settings(&settings)?;
+    reregister_all_shortcuts(&app)?;
     Ok(())
 }
 
