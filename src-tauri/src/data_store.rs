@@ -162,15 +162,28 @@ fn corrupt_archive_path(path: &PathBuf) -> PathBuf {
 
 fn write_json_with_backup(path: &PathBuf, content: &str) -> Result<(), String> {
     let tmp = temp_path(path);
-    fs::write(&tmp, content).map_err(|e| e.to_string())?;
+    let backup = backup_path(path);
+
+    fs::write(&tmp, content)
+        .map_err(|e| format!("Could not write temporary data file: {e}"))?;
+
     if path.exists() {
-        let _ = fs::remove_file(path);
+        fs::copy(path, &backup)
+            .map_err(|e| format!("Could not create data backup: {e}"))?;
+        fs::remove_file(path)
+            .map_err(|e| format!("Could not replace existing data file: {e}"))?;
     }
+
     fs::rename(&tmp, path).map_err(|e| {
         let _ = fs::remove_file(&tmp);
-        e.to_string()
+        if backup.exists() && !path.exists() {
+            let _ = fs::copy(&backup, path);
+        }
+        format!("Could not commit data file: {e}")
     })?;
-    let _ = fs::write(backup_path(path), content);
+
+    // Keep the backup synchronized after the first successful write as well.
+    fs::copy(path, &backup).map_err(|e| format!("Could not update data backup: {e}"))?;
     Ok(())
 }
 
@@ -276,11 +289,11 @@ pub fn load_snippets() -> Vec<Snippet> {
     list
 }
 
-pub fn save_snippets(snippets: &[Snippet]) {
+pub fn save_snippets(snippets: &[Snippet]) -> Result<(), String> {
     let path = get_snippets_path();
-    if let Ok(content) = serde_json::to_string_pretty(snippets) {
-        let _ = write_json_with_backup(&path, &content);
-    }
+    let content = serde_json::to_string_pretty(snippets)
+        .map_err(|e| format!("Could not serialize snippets: {e}"))?;
+    write_json_with_backup(&path, &content)
 }
 
 pub fn load_settings() -> Settings {
@@ -324,11 +337,11 @@ pub fn load_settings() -> Settings {
     }
 }
 
-pub fn save_settings(settings: &Settings) {
+pub fn save_settings(settings: &Settings) -> Result<(), String> {
     let path = get_settings_path();
-    if let Ok(content) = serde_json::to_string_pretty(settings) {
-        let _ = write_json_with_backup(&path, &content);
-    }
+    let content = serde_json::to_string_pretty(settings)
+        .map_err(|e| format!("Could not serialize settings: {e}"))?;
+    write_json_with_backup(&path, &content)
 }
 
 #[cfg(test)]
