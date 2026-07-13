@@ -435,6 +435,10 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: usize, lparam: i
     }
 
     let vk = info.vkCode;
+    let foreground = clipboard_manager::get_foreground_window();
+    if foreground != 0 && !clipboard_manager::is_system_window(foreground) {
+        LAST_TARGET_HWND.store(foreground, Ordering::SeqCst);
+    }
     let text = map_vk_to_text(vk);
     let ctrl = is_key_down(VK_CONTROL) || is_key_down(VK_LCONTROL) || is_key_down(VK_RCONTROL);
     let alt = is_key_down(VK_MENU) || is_key_down(VK_LMENU) || is_key_down(VK_RMENU);

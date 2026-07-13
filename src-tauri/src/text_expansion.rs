@@ -32,6 +32,9 @@ pub struct TextExpansion {
     pub word_boundary: bool,
     #[serde(default)]
     pub app_filter: Vec<String>,
+    /// Stable source snippet id when this expansion is managed from the snippet editor.
+    #[serde(default)]
+    pub source_snippet_id: Option<String>,
     #[serde(default)]
     pub created_at: String,
     #[serde(default)]
@@ -548,6 +551,7 @@ fn core_essentials_items(profile_name: Option<&str>) -> Vec<TextExpansion> {
             case_sensitive: false,
             word_boundary: true,
             app_filter: Vec::new(),
+            source_snippet_id: None,
             created_at: now.clone(),
             updated_at: now,
         },
@@ -725,8 +729,9 @@ fn build_default_catalog(locale: &str, profile_name: Option<&str>) -> TextExpans
             enabled: true,
             case_sensitive: false,
             word_boundary: true,
-            app_filter,
-            created_at: String::new(),
+                app_filter,
+                source_snippet_id: None,
+                created_at: String::new(),
             updated_at: String::new(),
         });
     }
@@ -776,6 +781,7 @@ fn seeded(trigger: &str, replacement: &str, description: &str, now: &str) -> Tex
         case_sensitive: false,
         word_boundary: true,
         app_filter: Vec::new(),
+        source_snippet_id: None,
         created_at: now.to_string(),
         updated_at: now.to_string(),
     }
@@ -792,8 +798,12 @@ fn legacy_from_snippets(snippets: &[Snippet]) -> Vec<TextExpansion> {
             }
             let created_at = snippet_timestamp_to_rfc3339(snippet.created_at).unwrap_or_else(|| now.clone());
             let updated_at = snippet_timestamp_to_rfc3339(snippet.last_used_at).unwrap_or_else(|| created_at.clone());
+            let source_snippet_id = snippet.id.clone().filter(|id| !id.trim().is_empty());
             Some(TextExpansion {
-                id: Uuid::new_v4().to_string(),
+                id: source_snippet_id
+                    .as_ref()
+                    .map(|id| format!("snippet:{id}"))
+                    .unwrap_or_else(|| Uuid::new_v4().to_string()),
                 trigger: trigger.to_string(),
                 replacement: snippet.content.clone(),
                 description: Some(snippet.title.clone()),
@@ -801,6 +811,7 @@ fn legacy_from_snippets(snippets: &[Snippet]) -> Vec<TextExpansion> {
                 case_sensitive: false,
                 word_boundary: true,
                 app_filter: Vec::new(),
+                source_snippet_id,
                 created_at,
                 updated_at,
             })
@@ -986,6 +997,46 @@ pub fn load_text_expansions() -> Vec<TextExpansion> {
     items
 }
 
+pub fn reconcile_snippets(
+    existing: &[TextExpansion],
+    previous_snippets: &[Snippet],
+    snippets: &[Snippet],
+) -> Result<Vec<TextExpansion>, String> {
+    let previous_ids: HashSet<String> = previous_snippets
+        .iter()
+        .filter_map(|snippet| snippet.id.clone())
+        .collect();
+    let mut next: Vec<TextExpansion> = existing
+        .iter()
+        .filter(|item| {
+            item.source_snippet_id
+                .as_ref()
+                .map(|id| !previous_ids.contains(id))
+                .unwrap_or(true)
+        })
+        .cloned()
+        .collect();
+
+    let mut trigger_owners: HashMap<String, Option<String>> = HashMap::new();
+    for item in &next {
+        trigger_owners.insert(normalize_trigger_key(&item.trigger), item.source_snippet_id.clone());
+    }
+
+    for snippet_item in legacy_from_snippets(snippets) {
+        let key = normalize_trigger_key(&snippet_item.trigger);
+        if let Some(owner) = trigger_owners.get(&key) {
+            if owner != &snippet_item.source_snippet_id {
+                return Err(format!("Expansion trigger '{}' is already in use", snippet_item.trigger));
+            }
+        }
+        trigger_owners.insert(key, snippet_item.source_snippet_id.clone());
+        next.push(snippet_item);
+    }
+
+    validate_items(&next)?;
+    Ok(next.into_iter().map(normalize_text_expansion).collect())
+}
+
 pub fn save_text_expansions(items: &[TextExpansion]) -> Result<Vec<TextExpansion>, String> {
     validate_items(items)?;
     let normalized: Vec<TextExpansion> = items.iter().cloned().map(normalize_text_expansion).collect();
@@ -1032,9 +1083,17 @@ pub fn export_payload(items: &[TextExpansion]) -> Result<String, String> {
     serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())
 }
 
+pub fn parse_import_payload(raw: &str) -> Result<Vec<TextExpansion>, String> {
+    let parsed = parse_text_expansion_payload(raw)?;
+    validate_items(&parsed)?;
+    Ok(dedupe_items(parsed))
+}
+
 pub fn import_payload(raw: &str) -> Result<Vec<TextExpansion>, String> {
-    let items = parse_text_expansion_payload(raw)?;
-    replace_runtime(items)
+    let normalized = parse_import_payload(raw)?;
+    save_text_expansions_to_disk(&normalized)?;
+    set_runtime(normalized.clone());
+    Ok(normalized)
 }
 
 pub fn current_snapshot() -> Vec<TextExpansion> {
@@ -1259,11 +1318,10 @@ mod tests {
         assert!((1..=3).contains(&value));
     }
 
-    #[test]
-    fn legacy_migration_creates_expansions_from_snippets() {
-        let snippets = vec![Snippet {
+    fn snippet_with_trigger(id: &str, trigger: &str, content: &str) -> Snippet {
+        Snippet {
             title: "Email".to_string(),
-            content: "can@example.com".to_string(),
+            content: content.to_string(),
             pinned: false,
             use_count: 0,
             category: None,
@@ -1274,16 +1332,51 @@ mod tests {
             color: None,
             created_at: 0,
             last_used_at: 0,
-            trigger: Some(":mail".to_string()),
+            trigger: Some(trigger.to_string()),
             slot: None,
             source_app: None,
-            id: None,
+            id: Some(id.to_string()),
             emoji: None,
             chain: Vec::new(),
-        }];
+        }
+    }
+
+    #[test]
+    fn legacy_migration_creates_expansions_from_snippets() {
+        let snippets = vec![snippet_with_trigger("email", ":mail", "can@example.com")];
         let items = legacy_from_snippets(&snippets);
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].trigger, ":mail");
         assert_eq!(items[0].replacement, "can@example.com");
+    }
+
+    #[test]
+    fn parse_import_payload_accepts_export_bundle() {
+        let now = now_rfc3339();
+        let exported = export_payload(&[seeded(":hello", "Hello", "Greeting", &now)]).unwrap();
+        let imported = parse_import_payload(&exported).unwrap();
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].trigger, ":hello");
+        assert_eq!(imported[0].replacement, "Hello");
+    }
+
+    #[test]
+    fn reconcile_preserves_imported_items_and_restores_snippet_items() {
+        let snippets = vec![snippet_with_trigger("email", ":mail", "can@example.com")];
+        let now = now_rfc3339();
+        let imported = vec![seeded(":hello", "Hello", "Greeting", &now)];
+        let reconciled = reconcile_snippets(&imported, &snippets, &snippets).unwrap();
+        assert!(reconciled.iter().any(|item| item.trigger == ":hello"));
+        assert!(reconciled.iter().any(|item| {
+            item.trigger == ":mail" && item.source_snippet_id.as_deref() == Some("email")
+        }));
+    }
+
+    #[test]
+    fn reconcile_rejects_import_conflict_with_snippet_trigger() {
+        let snippets = vec![snippet_with_trigger("email", ":mail", "can@example.com")];
+        let now = now_rfc3339();
+        let imported = vec![seeded(":MAIL", "Other", "Conflict", &now)];
+        assert!(reconcile_snippets(&imported, &snippets, &snippets).is_err());
     }
 }
