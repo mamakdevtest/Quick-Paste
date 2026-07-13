@@ -4,15 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QuickPaste</title>
-  <link rel="stylesheet" href="style.css">
   <!-- Local Fonts (offline-ready, no CDN) -->
   <link rel="stylesheet" href="fonts.css">
-  <!-- Local Tailwind CSS build -->
+  <!-- Local Tailwind CSS build (utility layout classes only) -->
   <link rel="stylesheet" href="assets/tailwind.css">
-
-
-
-  <style>
+  <!-- Legacy inline theme disabled: styles.css is the single source of truth -->
+  <style media="not all">
     /* ─── Base ───────────────────────────────────────────────────────────────── */
     html, body { background: transparent; overflow: hidden; }
     body { font-family: 'Inter', sans-serif; font-size: 13px; user-select: none; }
@@ -175,7 +172,7 @@
       flex: 0 0 auto;
     }
 
-    /* ─── Panel sliding ──────────────────────────────────────────────────��──── */
+    /* ─── Panel sliding ──────────────────────────────────────────────────���──── */
     #panelTrack {
       display: flex;
       flex-direction: row;

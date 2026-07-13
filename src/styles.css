@@ -11,3 +11,48 @@
 @media(max-width:700px){#textExpansionMainGrid{grid-template-columns:1fr!important;overflow-y:auto}#textExpansionMainGrid>section{min-height:300px}#textExpansionFieldGrid,#textExpansionToggleGrid,#textExpansionAppFilterGrid{grid-template-columns:1fr!important}#textExpansionOnboardingPanel .grid.grid-cols-\[0\.92fr_1\.08fr\]{grid-template-columns:1fr!important;overflow-y:auto}}
 @media(max-width:460px){#headerFrame{padding-inline:10px 7px!important}#headerFrame button{width:28px!important}#mainPageBtn,#dashboardBtn{display:none!important}#searchFrame{margin-inline:7px!important}#searchFrame>.flex:last-child{display:grid!important;grid-template-columns:1fr auto auto}#clipboardImportBtn{font-size:0!important}#clipboardImportBtn .material-symbols-outlined{font-size:14px!important}#scrollArea{padding-inline:7px!important}.snippet-card{min-height:70px}.snippet-meta-row .tag-chip:nth-of-type(n+2),.char-badge,.card-preview-btn{display:none!important}#footerFrame{min-height:43px}#addBtn:after{content:'New'}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SEMANTIC UTILITY LAYER — single source of truth for the d-*/l-* classes the
+   JS injects at runtime and the markup uses. The prebuilt tailwind.css ships
+   stale/hardcoded values (and is missing several of these entirely), so every
+   rule here is mapped to the --qp-* design tokens above and marked !important
+   to win the cascade regardless of load order.
+   ═════════════════════════════════════════════════════════════════════════ */
+:root{--l-bg:#eef1f4;--l-surface:#ffffff;--l-text:#1a2028;--l-dim:#5c6875}
+
+/* — Backgrounds — */
+.bg-d-bg,.dark\:bg-d-bg{background-color:var(--qp-bg)!important}
+.bg-d-card,.dark\:bg-d-card{background-color:var(--qp-surface)!important}
+.bg-d-input,.dark\:bg-d-input{background-color:var(--qp-input-bg)!important}
+.bg-d-input\/50,.dark\:bg-d-input\/50{background-color:color-mix(in srgb,var(--qp-input-bg) 50%,transparent)!important}
+.dark\:bg-d-input\/60{background-color:color-mix(in srgb,var(--qp-input-bg) 60%,transparent)!important}
+.bg-d-hover,.dark\:bg-d-hover,.hover\:bg-d-hover:hover,.dark\:hover\:bg-d-hover:hover{background-color:var(--qp-hover-strong)!important}
+.bg-d-border,.dark\:bg-d-border{background-color:var(--qp-border)!important}
+.bg-d-border\/40,.dark\:bg-d-border\/40{background-color:color-mix(in srgb,var(--qp-border) 40%,transparent)!important}
+.bg-d-dim\/20{background-color:color-mix(in srgb,var(--qp-muted) 20%,transparent)!important}
+.bg-d-primary,.dark\:bg-d-primary{background-color:var(--qp-primary)!important}
+.bg-d-primary\/10{background-color:color-mix(in srgb,var(--qp-primary) 10%,transparent)!important}
+.bg-d-primary\/15{background-color:color-mix(in srgb,var(--qp-primary) 15%,transparent)!important}
+.bg-d-primary\/20{background-color:color-mix(in srgb,var(--qp-primary) 20%,transparent)!important}
+.bg-l-bg{background-color:var(--l-bg)!important}
+
+/* — Text — */
+.text-d-primary,.dark\:text-d-primary,.hover\:text-d-primary:hover{color:var(--qp-primary)!important}
+.text-d-text,.dark\:text-d-text,.hover\:text-d-text:hover,.hover\:dark\:text-d-text:hover{color:var(--qp-text)!important}
+.text-d-dim,.dark\:text-d-dim{color:var(--qp-muted)!important}
+.text-l-text{color:var(--l-text)!important}
+.text-l-dim{color:var(--l-dim)!important}
+
+/* — Borders — */
+.border-d-border,.dark\:border-d-border{border-color:var(--qp-border)!important}
+.border-d-border\/50{border-color:color-mix(in srgb,var(--qp-border) 50%,transparent)!important}
+.dark\:border-d-border\/70{border-color:color-mix(in srgb,var(--qp-border) 70%,transparent)!important}
+.border-d-primary,.dark\:border-d-primary,.focus\:border-d-primary:focus,.dark\:focus\:border-d-primary:focus,.hover\:dark\:border-d-primary:hover{border-color:var(--qp-primary)!important}
+.hover\:dark\:border-d-primary\/70:hover{border-color:color-mix(in srgb,var(--qp-primary) 70%,transparent)!important}
+
+/* — Placeholder / divide / selection — */
+.dark\:placeholder-d-dim::placeholder,.placeholder\:text-d-dim\/50::placeholder{color:color-mix(in srgb,var(--qp-muted) 50%,transparent)!important}
+.placeholder\:dark\:text-d-dim\/50::placeholder{color:color-mix(in srgb,var(--qp-muted) 50%,transparent)!important}
+.dark\:divide-d-border>*+*{border-color:var(--qp-border)!important}
+.selection\:bg-d-primary::selection{background-color:var(--qp-primary)!important;color:var(--qp-primary-contrast)!important}
