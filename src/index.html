@@ -8,8 +8,9 @@
   <link rel="stylesheet" href="fonts.css">
   <!-- Local Tailwind CSS build (utility layout classes only) -->
   <link rel="stylesheet" href="assets/tailwind.css">
-  <!-- Legacy inline theme disabled: styles.css is the single source of truth -->
-  <style media="not all">
+  <!-- Base layout + component structure. Theme tokens (--qp-*) are injected at
+       runtime by features.js, and styles.css (loaded last) is the override layer. -->
+  <style>
     /* ─── Base ───────────────────────────────────────────────────────────────── */
     html, body { background: transparent; overflow: hidden; }
     body { font-family: 'Inter', sans-serif; font-size: 13px; user-select: none; }

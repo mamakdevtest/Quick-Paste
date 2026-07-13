@@ -92,3 +92,32 @@
 .placeholder\:dark\:text-d-dim\/50::placeholder{color:color-mix(in srgb,var(--qp-muted) 50%,transparent)!important}
 .dark\:divide-d-border>*+*{border-color:var(--qp-border)!important}
 .selection\:bg-d-primary::selection{background-color:var(--qp-primary)!important;color:var(--qp-primary-contrast)!important}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE LAYER — overlays never touch the window edges and always fit the
+   available height (with an internal scroll), so the Add/Edit dialog, command
+   palette, quick look and placeholder prompts stay usable at any window size.
+   ═════════════════════════════════════════════════════════════════════════ */
+#dialogOverlay,#placeholderOverlay,#quickLookOverlay{
+  padding:16px!important;box-sizing:border-box;
+}
+#commandPaletteOverlay{padding:48px 16px 16px!important;box-sizing:border-box}
+#dialogOverlay>div,#placeholderOverlay>div,#quickLookOverlay>div,#paletteContainer{
+  width:100%!important;max-height:calc(100dvh - 32px)!important;display:flex;flex-direction:column;
+}
+#dialogOverlay>div{max-width:480px!important}
+/* Card action buttons stay tappable and wrap instead of clipping on narrow cards */
+.card-actions{display:flex;flex-wrap:wrap;gap:6px}
+.card-actions button{min-width:32px;min-height:28px}
+
+/* Search / filter toolbar wraps gracefully on very narrow windows */
+@media (max-width:380px){
+  #searchFrame>.flex:first-child{flex-wrap:wrap!important}
+  #categoryFilter{min-width:0!important;flex:1 1 auto}
+  #dashboardStatsGrid{grid-template-columns:1fr 1fr!important}
+}
+/* Short windows: let dialog body scroll instead of overflowing the viewport */
+@media (max-height:520px){
+  #dialogOverlay,#placeholderOverlay,#quickLookOverlay{padding:8px!important}
+  #dialogOverlay>div,#placeholderOverlay>div,#quickLookOverlay>div{max-height:calc(100dvh - 16px)!important}
+}
