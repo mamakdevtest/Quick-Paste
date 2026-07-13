@@ -1,17 +1,42 @@
 const DEFAULT_TIMEOUT_MS = 15000;
-const PREVIEW_RESULTS = {
-  load_settings: {},
-  load_snippets: [],
-  load_text_expansions: [],
-  load_text_expansion_catalog: { version: 1, locale: 'en', recommendedPackIds: [], packs: [] },
-  get_active_process_name: '',
-  get_pinned: false,
-  capture_foreground_window: 0,
-  store_own_hwnd: null,
-};
-const PREVIEW_MUTATIONS = new Set([
-  'save_settings', 'save_snippets', 'save_text_expansions', 'set_pinned',
-  'set_window_opacity', 'toggle_clipboard_monitor', 'close_welcome_window',
+
+/**
+ * In-memory backend stand-in used only when the native Tauri runtime is absent
+ * (e.g. the browser preview). It round-trips reads and writes so the UI behaves
+ * exactly like it does against the Rust backend, instead of silently dropping
+ * mutations. The native path never touches this.
+ */
+function createPreviewStore() {
+  const state = {
+    settings: {},
+    snippets: [],
+    expansions: [],
+    catalog: { version: 1, locale: 'en', recommendedPackIds: [], packs: [] },
+  };
+  const clone = (value) => structuredClone(value);
+  return {
+    handle(command, payload) {
+      switch (command) {
+        case 'load_settings': return clone(state.settings);
+        case 'save_settings': state.settings = clone(payload?.settings || {}); return null;
+        case 'load_snippets': return clone(state.snippets);
+        case 'save_snippets': state.snippets = clone(payload?.snippets || []); return null;
+        case 'load_text_expansions': return clone(state.expansions);
+        case 'save_text_expansions': state.expansions = clone(payload?.items || []); return clone(state.expansions);
+        case 'load_text_expansion_catalog': return clone(state.catalog);
+        case 'clear_all_data': state.snippets = []; state.settings = {}; state.expansions = []; return null;
+        case 'get_active_process_name': return '';
+        case 'get_pinned': return false;
+        case 'capture_foreground_window': return 0;
+        default: return undefined;
+      }
+    },
+  };
+}
+
+const NON_PERSISTED_PREVIEW = new Set([
+  'set_pinned', 'set_window_opacity', 'toggle_clipboard_monitor',
+  'close_welcome_window', 'store_own_hwnd', 'reregister_shortcuts',
 ]);
 
 export class AppCommandError extends Error {
@@ -41,15 +66,14 @@ export function createTauriGateway(runtime = window.__TAURI__) {
   const getCurrentWindow = runtime?.window?.getCurrentWindow;
   const isAvailable = typeof nativeInvoke === 'function';
   const pendingMutations = new Map();
+  const previewStore = isAvailable ? null : createPreviewStore();
 
   async function invoke(command, payload, options = {}) {
     if (!isAvailable) {
+      const handled = previewStore.handle(command, payload);
+      if (handled !== undefined) return handled;
       if (options.previewValue !== undefined) return structuredClone(options.previewValue);
-      if (Object.hasOwn(PREVIEW_RESULTS, command)) return structuredClone(PREVIEW_RESULTS[command]);
-      if (PREVIEW_MUTATIONS.has(command)) {
-        if (command === 'save_text_expansions') return structuredClone(payload?.items || []);
-        return null;
-      }
+      if (NON_PERSISTED_PREVIEW.has(command)) return null;
       throw new AppCommandError(command, 'Tauri runtime is unavailable', 'RUNTIME_UNAVAILABLE');
     }
     try {
