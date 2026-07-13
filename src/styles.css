@@ -121,3 +121,40 @@
   #dialogOverlay,#placeholderOverlay,#quickLookOverlay{padding:8px!important}
   #dialogOverlay>div,#placeholderOverlay>div,#quickLookOverlay>div{max-height:calc(100dvh - 16px)!important}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FLUID WIDTH SYSTEM — QuickPaste is a resizable desktop window, so content
+   must adapt from a ~320px launcher up to a wide maximized window. Instead of
+   stretching a single column edge-to-edge, the snippet list becomes a
+   responsive card grid and every panel's content is capped and centered so it
+   never looks sparse or overstretched on large screens.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Snippet list: single column on the narrow launcher, auto-filling card grid
+   as the window widens. Content is capped and centered on large windows. */
+#listContainer{
+  display:grid!important;
+  grid-template-columns:1fr;
+  gap:8px!important;
+  align-content:start;
+  width:100%;max-width:1120px;margin-inline:auto;
+}
+.empty-state{grid-column:1/-1}            /* span every column, stay centered */
+.snippet-card{min-height:0}               /* let grid rows size to content */
+@media (min-width:600px){
+  #listContainer{grid-template-columns:repeat(auto-fill,minmax(248px,1fr))!important}
+}
+
+/* Center the search / toolbar / bulk bar content on wide windows while the
+   full-width divider borders still span the panel edge-to-edge. */
+#searchFrame>.flex,#bulkActionBar>*{max-width:1120px}
+#searchFrame>.flex{margin-inline:auto;width:100%}
+
+/* Dashboard & Settings inner content: capped + centered so cards/rows don't
+   stretch across a maximized window. */
+#dashboardScroll>div,#settingsScroll>div{max-width:900px;margin-inline:auto;width:100%}
+
+/* Let the search field breathe on wider windows (inline cap was 50%). */
+@media (min-width:600px){
+  #searchFrame>.flex:first-child>.relative{flex:1 1 auto!important;max-width:none!important}
+}
