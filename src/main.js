@@ -36,7 +36,7 @@ let appSettings      = {};
 let settingsOpen     = false;
 let sortMode         = 'default';
 let multiSelectMode  = false;
-let selectedSnippets = new Set(); // indices into filteredSnippets
+  let selectedSnippets = new Set(); // stable indices into the source snippets array
 let activeProcessName = null; // current foreground app name for context-aware sort
 let currentThemeId   = 'violet'; // active theme id
 let dashboardOpen    = false; // global state for dashboard visibility
@@ -526,7 +526,7 @@ function loadAndDisplay() {
   filteredSnippets.forEach((item, index) => {
     const s = item.s;
     const card = document.createElement('div');
-    card.className = `snippet-card ${s.pinned ? 'pinned-card' : ''} ${index === selectedIndex ? 'selected-card' : ''} ${multiSelectMode && selectedSnippets.has(index) ? 'multi-selected' : ''}`;
+    card.className = `snippet-card ${s.pinned ? 'pinned-card' : ''} ${index === selectedIndex ? 'selected-card' : ''} ${multiSelectMode && selectedSnippets.has(item.i) ? 'multi-selected' : ''}`;
     card.draggable = !multiSelectMode;
 
     // Color label border
@@ -574,7 +574,7 @@ function loadAndDisplay() {
     const secretLock = s.is_secret ? `<span class="secret-lock" title="Secret">🔒</span>` : '';
     const charBadge  = `<span class="char-badge" title="Content length">${formatCharCount(s.content.length)}</span>`;
     const timeAgoStr = s.last_used_at ? `<span class="time-ago" title="Last used">${timeAgo(s.last_used_at)}</span>` : (s.created_at ? `<span class="time-ago" title="Created">${timeAgo(s.created_at)}</span>` : '');
-    const multiCheckbox = multiSelectMode ? `<span class="multi-check">${selectedSnippets.has(index) ? '☑' : '☐'}</span>` : '';
+    const multiCheckbox = multiSelectMode ? `<span class="multi-check" aria-hidden="true">${selectedSnippets.has(item.i) ? 'Selected' : ''}</span>` : '';
 
     // Content preview: masked if secret
     const previewText  = s.is_secret ? '••••••••••••' : highlightText(escapeHtml(s.content), queryLower);
@@ -695,10 +695,10 @@ function loadAndDisplay() {
     // Multi-select click
     if (multiSelectMode) {
       card.addEventListener('click', () => {
-        if (selectedSnippets.has(index)) {
-          selectedSnippets.delete(index);
+        if (selectedSnippets.has(item.i)) {
+          selectedSnippets.delete(item.i);
         } else {
-          selectedSnippets.add(index);
+          selectedSnippets.add(item.i);
         }
         updateBulkBar();
         loadAndDisplay();
@@ -778,10 +778,23 @@ function renderEmptyState() {
   listContainer.appendChild(el);
 }
 
-function swapSnippets(fromIdx, toIdx) {
+async function swapSnippets(fromIdx, toIdx) {
+  if (!Number.isInteger(fromIdx) || !Number.isInteger(toIdx)
+      || fromIdx < 0 || toIdx < 0
+      || fromIdx >= snippets.length || toIdx >= snippets.length) {
+    return;
+  }
+  const previous = [...snippets];
   const item = snippets.splice(fromIdx, 1)[0];
   snippets.splice(toIdx, 0, item);
-  invoke('save_snippets', { snippets }).then(() => reloadData());
+  try {
+    await invoke('save_snippets', { snippets });
+    await reloadData();
+  } catch (error) {
+    snippets = previous;
+    loadAndDisplay();
+    showToast(`Reorder failed: ${String(error)}`, 2400, 'error');
+  }
 }
 
 // ─── Multi-select ──────────────────────────────────────────────────────────────
@@ -809,12 +822,19 @@ bulkDeleteBtn.addEventListener('click', async () => {
   if (selectedSnippets.size === 0) return;
   if (!confirm(`Delete ${selectedSnippets.size} snippet(s)?`)) return;
 
-  // Map filtered indices back to actual indices
-  const actualIndices = [...selectedSnippets].map(fi => filteredSnippets[fi].i).sort((a, b) => b - a);
+  const actualIndices = [...selectedSnippets]
+    .filter(index => Number.isInteger(index) && index >= 0 && index < snippets.length)
+    .sort((a, b) => b - a);
   for (const idx of actualIndices) {
     snippets.splice(idx, 1);
   }
-  await invoke('save_snippets', { snippets });
+  try {
+    await invoke('save_snippets', { snippets });
+  } catch (error) {
+    await reloadData();
+    showToast(`Delete failed: ${String(error)}`, 2400, 'error');
+    return;
+  }
   selectedSnippets.clear();
   multiSelectMode = false;
   multiSelectBtn.classList.remove('active');
@@ -825,8 +845,13 @@ bulkDeleteBtn.addEventListener('click', async () => {
 
 // ─── Selection & AutoPaste ─────────────────────────────────────────────────────
 async function selectAndPaste(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= snippets.length) {
+    showToast('This snippet is no longer available.', 1800, 'error');
+    await reloadData();
+    return;
+  }
   const now = Date.now();
-  snippets[index].use_count += 1;
+  snippets[index].use_count = Number(snippets[index].use_count || 0) + 1;
   snippets[index].last_used_at = now;
   await invoke('save_snippets', { snippets });
 
@@ -1228,7 +1253,7 @@ startupToggle.addEventListener('change', async () => {
   }
 });
 
-// ─── Opacity Slider ───────────────────────────────────────────────────────────
+// ─── Opacity Slider ─────────────────────────────────────────────────────────���─
 opacitySlider.addEventListener('input', () => {
   const val = parseInt(opacitySlider.value) / 100;
   opacityLabel.textContent = `${opacitySlider.value}%`;

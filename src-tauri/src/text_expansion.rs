@@ -338,27 +338,54 @@ fn set_runtime(items: Vec<TextExpansion>) {
 
 fn load_text_expansions_from_disk() -> Vec<TextExpansion> {
     let path = get_text_expansions_path();
-    if !path.exists() {
+    let backup = path.with_extension("json.bak");
+    if !path.exists() && !backup.exists() {
         return Vec::new();
     }
 
-    let raw = match fs::read_to_string(&path) {
-        Ok(content) => content,
-        Err(_) => return Vec::new(),
-    };
+    for candidate in [&path, &backup] {
+        if let Ok(raw) = fs::read_to_string(candidate) {
+            if let Ok(items) = parse_text_expansion_payload(&raw) {
+                if candidate == &backup && !path.exists() {
+                    let _ = fs::copy(&backup, &path);
+                }
+                return items;
+            }
+        }
+    }
 
-    parse_text_expansion_payload(&raw).unwrap_or_default()
+    Vec::new()
 }
 
 fn save_text_expansions_to_disk(items: &[TextExpansion]) -> Result<(), String> {
     let path = get_text_expansions_path();
+    let tmp = path.with_extension("json.tmp");
+    let backup = path.with_extension("json.bak");
     let bundle = TextExpansionBundle {
         version: 1,
         text_expansions: items.to_vec(),
         exported_at: Some(now_rfc3339()),
     };
     let content = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
-    fs::write(path, content).map_err(|e| e.to_string())
+    fs::write(&tmp, content).map_err(|e| format!("Could not write expansion data: {e}"))?;
+
+    if path.exists() {
+        fs::copy(&path, &backup)
+            .map_err(|e| format!("Could not back up expansion data: {e}"))?;
+        fs::remove_file(&path)
+            .map_err(|e| format!("Could not replace expansion data: {e}"))?;
+    }
+
+    fs::rename(&tmp, &path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        if backup.exists() && !path.exists() {
+            let _ = fs::copy(&backup, &path);
+        }
+        format!("Could not commit expansion data: {e}")
+    })?;
+    fs::copy(&path, &backup)
+        .map_err(|e| format!("Could not update expansion backup: {e}"))?;
+    Ok(())
 }
 
 fn parse_text_expansion_payload(raw: &str) -> Result<Vec<TextExpansion>, String> {

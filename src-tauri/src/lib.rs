@@ -143,35 +143,38 @@ fn hide_welcome_window(app: &AppHandle) {
 /// unregisters all existing, then registers the app hotkey and all snippet hotkeys.
 fn reregister_all_shortcuts(app: &AppHandle) -> Result<(), String> {
     let global_shortcut = app.global_shortcut();
-    let _ = global_shortcut.unregister_all();
+    global_shortcut
+        .unregister_all()
+        .map_err(|e| format!("Could not clear existing shortcuts: {e}"))?;
 
-    // Register single app hotkey: Alt+Q (rebinding previous Alt+W behavior). Launcher overlay disabled.
-    if let Ok(alt_q) = Shortcut::from_str("Alt+Q") {
-        let _ = global_shortcut.register(alt_q);
-    }
+    let settings = data_store::load_settings();
+    let app_hotkey = format_hotkey(settings.hotkey.trim());
+    let app_shortcut = Shortcut::from_str(&app_hotkey)
+        .map_err(|e| format!("Invalid app shortcut '{app_hotkey}': {e}"))?;
+    global_shortcut
+        .register(app_shortcut)
+        .map_err(|e| format!("Could not register app shortcut '{app_hotkey}': {e}"))?;
 
-    // Register all snippet custom shortcuts
     let snippets = data_store::load_snippets();
     for snippet in &snippets {
-        if let Some(ref sc) = snippet.shortcut {
-            if !sc.trim().is_empty() {
-                let formatted = format_hotkey(sc);
-                if let Ok(shortcut) = Shortcut::from_str(&formatted) {
-                    let _ = global_shortcut.register(shortcut);
-                }
-            }
+        if let Some(sc) = snippet.shortcut.as_deref().filter(|value| !value.trim().is_empty()) {
+            let formatted = format_hotkey(sc);
+            let shortcut = Shortcut::from_str(&formatted)
+                .map_err(|e| format!("Invalid shortcut '{formatted}' for '{}': {e}", snippet.title))?;
+            global_shortcut
+                .register(shortcut)
+                .map_err(|e| format!("Shortcut '{formatted}' for '{}' is unavailable: {e}", snippet.title))?;
         }
     }
 
-    // Register Alt+1..9 favorite slots
     for snippet in &snippets {
-        if let Some(slot) = snippet.slot {
-            if (1..=9).contains(&slot) {
-                let formatted = format!("Alt+{}", slot);
-                if let Ok(shortcut) = Shortcut::from_str(&formatted) {
-                    let _ = global_shortcut.register(shortcut);
-                }
-            }
+        if let Some(slot @ 1..=9) = snippet.slot {
+            let formatted = format!("Alt+{slot}");
+            let shortcut = Shortcut::from_str(&formatted)
+                .map_err(|e| format!("Invalid favorite shortcut '{formatted}': {e}"))?;
+            global_shortcut
+                .register(shortcut)
+                .map_err(|e| format!("Favorite shortcut '{formatted}' is unavailable: {e}"))?;
         }
     }
 
@@ -188,9 +191,9 @@ fn load_settings() -> Settings {
 }
 
 #[tauri::command]
-fn save_settings(app: AppHandle, settings: Settings) {
-    data_store::save_settings(&settings);
-    let _ = reregister_all_shortcuts(&app);
+fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
+    data_store::save_settings(&settings)?;
+    reregister_all_shortcuts(&app)
 }
 
 #[tauri::command]
@@ -199,10 +202,11 @@ fn load_snippets() -> Vec<Snippet> {
 }
 
 #[tauri::command]
-fn save_snippets(app: AppHandle, snippets: Vec<Snippet>) {
-    data_store::save_snippets(&snippets);
-    let _ = reregister_all_shortcuts(&app);
-    let _ = app.emit("snippets-updated", ());
+fn save_snippets(app: AppHandle, snippets: Vec<Snippet>) -> Result<(), String> {
+    data_store::save_snippets(&snippets)?;
+    reregister_all_shortcuts(&app)?;
+    app.emit("snippets-updated", ())
+        .map_err(|e| format!("Snippets were saved but the UI could not be notified: {e}"))
 }
 
 #[tauri::command]
